@@ -1,7 +1,57 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="md_theme_light_primary">#0061A4</color>
-    <color name="md_theme_light_onPrimary">#FFFFFF</color>
-    <color name="md_theme_light_surface">#FFFBFE</color>
-    <color name="md_theme_light_onSurface">#1C1B1F</color>
+    <!-- Базовые -->
+    <color name="white">#FFFFFFFF</color>
+    <color name="white_70">#B3FFFFFF</color>
+    <color name="white_50">#80FFFFFF</color>
+    <color name="text_primary_dark_bg">#FFFFFFFF</color>
+    <color name="text_secondary_dark_bg">#B3FFFFFF</color>
+
+    <!-- Широкие карточки поверх сцены (тёмные полупрозрачные, как в референсе) -->
+    <color name="card_background">#CC263238</color>
+    <color name="card_header_text">#FFB0BEC5</color>
+    <color name="card_divider">#33FFFFFF</color>
+    <color name="accent_orange">#FFFF9800</color>
+    <color name="accent_blue">#FF4FC3F7</color>
+
+    <!-- Палитры сцены: небо верх/низ, холм дальний/ближний -->
+    <color name="scene_clear_day_top">#FF4A90D9</color>
+    <color name="scene_clear_day_bottom">#FFA8D0F0</color>
+    <color name="scene_clear_day_hill_far">#FF7FB2E5</color>
+    <color name="scene_clear_day_hill_near">#FF5E97D1</color>
+
+    <color name="scene_cloudy_day_top">#FF6B7B8C</color>
+    <color name="scene_cloudy_day_bottom">#FF9AA7B2</color>
+    <color name="scene_cloudy_day_hill_far">#FF8494A3</color>
+    <color name="scene_cloudy_day_hill_near">#FF6E7F8F</color>
+
+    <color name="scene_rain_day_top">#FF5A6672</color>
+    <color name="scene_rain_day_bottom">#FF8A95A0</color>
+    <color name="scene_rain_day_hill_far">#FF75818D</color>
+    <color name="scene_rain_day_hill_near">#FF616D79</color>
+
+    <color name="scene_snow_day_top">#FF8FA3B5</color>
+    <color name="scene_snow_day_bottom">#FFC9D6E2</color>
+    <color name="scene_snow_day_hill_far">#FFB4C4D2</color>
+    <color name="scene_snow_day_hill_near">#FF9DAFC0</color>
+
+    <color name="scene_clear_night_top">#FF0D1B2A</color>
+    <color name="scene_clear_night_bottom">#FF1B2D45</color>
+    <color name="scene_clear_night_hill_far">#FF16263C</color>
+    <color name="scene_clear_night_hill_near">#FF101D30</color>
+
+    <color name="scene_cloudy_night_top">#FF1A222C</color>
+    <color name="scene_cloudy_night_bottom">#FF2A333E</color>
+    <color name="scene_cloudy_night_hill_far">#FF232C37</color>
+    <color name="scene_cloudy_night_hill_near">#FF1C242E</color>
+
+    <!-- Элементы сцены -->
+    <color name="scene_pole">#FFECEFF1</color>
+    <color name="scene_sock_orange">#FFFF7043</color>
+    <color name="scene_sock_white">#FFF5F5F5</color>
+    <color name="scene_rain_drop">#99CFE8FC</color>
+    <color name="scene_snow_flake">#E6FFFFFF</color>
+    <color name="scene_star">#CCFFFFFF</color>
+    <color name="scene_sun">#FFFFD54F</color>
+    <color name="scene_moon">#FFECEFF1</color>
 </resources>
