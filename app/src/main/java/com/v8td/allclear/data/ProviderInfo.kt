@@ -1,7 +1,7 @@
 package com.v8td.allclear.data
 
 /**
- * Информация о провайдере для отображения в настройках.
+ * Метаинформация о провайдере для экрана настроек.
  */
 data class ProviderInfo(
     val id: String,
@@ -9,46 +9,49 @@ data class ProviderInfo(
     val description: String,
     val requiresKey: Boolean,
     val backgroundAllowed: Boolean,
+    val hasForecast: Boolean,
     val attribution: String?
 )
 
-/**
- * Список всех доступных провайдеров с метаинформацией.
- */
 object ProviderRegistry {
 
     fun getAll(): List<ProviderInfo> = listOf(
         ProviderInfo(
             id = WeatherRepository.PROVIDER_OPEN_METEO,
             name = "Open-Meteo",
-            description = "Основной бесплатный источник. Без ключа, без ограничений.",
+            description = "Основной источник. Бесплатно, без ключа.",
             requiresKey = false,
             backgroundAllowed = true,
+            hasForecast = true,
             attribution = "© Open-Meteo.com (CC BY 4.0)"
         ),
         ProviderInfo(
             id = WeatherRepository.PROVIDER_MET_NORWAY,
-            name = "MET Norway (Yr.no)",
-            description = "Точные данные. Только при открытом приложении (правила API).",
+            name = "MET Norway",
+            description = "Точный прогноз. Только при открытом приложении; " +
+                "в фоне автоматически используется Open-Meteo.",
             requiresKey = false,
             backgroundAllowed = false,
+            hasForecast = true,
             attribution = "© MET Norway (CC BY 4.0)"
         ),
         ProviderInfo(
             id = WeatherRepository.PROVIDER_METAR,
-            name = "AviationWeather METAR",
-            description = "Данные с аэродромных станций. Только текущая погода, без прогноза.",
+            name = "METAR (авиаметео)",
+            description = "Наблюдения аэродромных станций. Прогноз дополняется от Open-Meteo.",
             requiresKey = false,
             backgroundAllowed = true,
-            attribution = "© AviationWeather.gov"
+            hasForecast = false,
+            attribution = "© AviationWeather.gov (NOAA)"
         ),
         ProviderInfo(
             id = WeatherRepository.PROVIDER_OWM,
             name = "OpenWeatherMap",
-            description = "Требуется бесплатный API-ключ. Прогноз на 5 дней.",
+            description = "Нужен бесплатный API-ключ (без карты). Прогноз на 5 дней.",
             requiresKey = true,
             backgroundAllowed = true,
-            attribution = "© OpenWeatherMap"
+            hasForecast = true,
+            attribution = "© OpenWeather Ltd"
         )
     )
 
