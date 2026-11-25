@@ -1,4 +1,90 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Всё ясно</string>
+
+    <!-- Города -->
+    <string name="current_location">Текущее местоположение</string>
+    <string name="add_city">Добавить город</string>
+    <string name="remove_city">Удалить город</string>
+    <string name="city_limit_reached">Максимум 10 городов</string>
+    <string name="search_city">Поиск города</string>
+    <string name="auto_location">Автоопределение</string>
+
+    <!-- Состояния -->
+    <string name="no_data">—</string>
+    <string name="updated_just_now">Обновлено только что</string>
+    <string name="updated_min_ago">Обновлено %1$d мин назад</string>
+    <string name="updated_hours_ago">Обновлено %1$d ч назад</string>
+    <string name="location_permission_needed">Нужно разрешение на местоположение</string>
+    <string name="location_unavailable">Не удалось определить местоположение</string>
+    <string name="network_error">Нет свежих данных</string>
+    <string name="stale_data_notice">Показаны сохранённые данные</string>
+    <string name="loading">Загрузка…</string>
+
+    <!-- Действия -->
+    <string name="refresh">Обновить</string>
+    <string name="settings">Настройки</string>
+    <string name="cancel">Отмена</string>
+    <string name="ok">ОК</string>
+    <string name="delete">Удалить</string>
+
+    <!-- Секции -->
+    <string name="hourly_forecast">Почасовой прогноз</string>
+    <string name="daily_forecast">Ежедневный прогноз</string>
+    <string name="details">Подробности</string>
+    <string name="astronomy">Астрономия</string>
+    <string name="now">Сейчас</string>
+    <string name="today">Сегодня</string>
+    <string name="tomorrow">Завтра</string>
+    <string name="as_of">По состоянию на %1$s</string>
+
+    <!-- Показатели -->
+    <string name="feels_like">Ощущается</string>
+    <string name="wind">Ветер</string>
+    <string name="humidity">Влажность</string>
+    <string name="pressure">Давление</string>
+    <string name="precipitation">Осадки</string>
+    <string name="visibility">Видимость</string>
+    <string name="uv_index">Индекс УФ</string>
+    <string name="dew_point">Точка росы</string>
+    <string name="sunrise">Восход</string>
+    <string name="sunset">Закат</string>
+    <string name="moon_phase">Фаза луны</string>
+    <string name="day_length">Долгота дня</string>
+    <string name="wind_gusts">Порывы</string>
+    <string name="day_length_format">%1$d ч %2$d мин</string>
+
+    <!-- Направления ветра -->
+    <string name="wind_dir_n">С</string>
+    <string name="wind_dir_ne">СВ</string>
+    <string name="wind_dir_e">В</string>
+    <string name="wind_dir_se">ЮВ</string>
+    <string name="wind_dir_s">Ю</string>
+    <string name="wind_dir_sw">ЮЗ</string>
+    <string name="wind_dir_w">З</string>
+    <string name="wind_dir_nw">СЗ</string>
+
+    <!-- Единицы -->
+    <string name="unit_ms">м/с</string>
+    <string name="unit_kmh">км/ч</string>
+    <string name="unit_mhg">мм рт. ст.</string>
+    <string name="unit_hpa">гПа</string>
+    <string name="unit_km">км</string>
+
+    <!-- УФ -->
+    <string name="uv_low">Низкий</string>
+    <string name="uv_moderate">Умеренный</string>
+    <string name="uv_high">Высокий</string>
+    <string name="uv_very_high">Очень высокий</string>
+    <string name="uv_extreme">Экстремальный</string>
+
+    <!-- Луна -->
+    <string name="moon_new">Новолуние</string>
+    <string name="moon_waxing_crescent">Растущий серп</string>
+    <string name="moon_first_quarter">Первая четверть</string>
+    <string name="moon_waxing_gibbous">Растущая луна</string>
+    <string name="moon_full">Полнолуние</string>
+    <string name="moon_waning_gibbous">Убывающая луна</string>
+    <string name="moon_last_quarter">Последняя четверть</string>
+    <string name="moon_waning_crescent">Убывающий серп</string>
 </resources>
