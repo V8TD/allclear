@@ -2,100 +2,141 @@ package com.v8td.allclear.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONArray
 import org.json.JSONObject
-import java.io.IOException
+import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 /**
  * Базовый интерфейс для всех провайдеров погоды.
- * Каждый провайдер должен уметь получать текущую погоду и прогноз по координатам.
  */
 interface WeatherProvider {
     val name: String
-    
-    /**
-     * Получить данные о погоде.
-     * @param lat Широта
-     * @param lon Долгота
-     * @return Объект WeatherData или null при ошибке
-     */
     suspend fun getWeather(lat: Double, lon: Double): WeatherData?
 }
 
 /**
- * Универсальная модель данных погоды.
- * Агрегирует информацию от разных источников в единый формат.
+ * Универсальная модель данных погоды (единый формат для всех источников).
+ * Температура °C, ветер м/с, давление гПа, видимость км.
+ * null = данных нет (в UI показывается прочерк).
  */
 data class WeatherData(
-    val temperature: Double,          // Текущая температура (°C)
-    val feelsLike: Double,            // Ощущается как (°C)
-    val conditionCode: Int,           // Код погоды (Yahoo/Chronus формат 0-47)
-    val description: String,          // Текстовое описание
-    val humidity: Int,                // Влажность (%)
-    val windSpeed: Double,            // Скорость ветра (м/с)
-    val windGust: Double?,            // Порывы ветра (м/с), может быть null
-    val windDirection: Int,           // Направление ветра (градусы 0-360)
-    val pressure: Double,             // Давление (гПа)
-    val visibility: Double?,          // Видимость (км), может быть null
-    val uvIndex: Double?,             // УФ-индекс, может быть null
-    val precipitationProb: Int?,      // Вероятность осадков (%), может быть null
-    val sunrise: Long,                // Восход (Unix timestamp ms)
-    val sunset: Long,                 // Закат (Unix timestamp ms)
-    val dailyForecast: List<DailyForecast>,   // Прогноз на 7 дней
-    val hourlyForecast: List<HourlyForecast>  // Прогноз на 24 часа
+    val temperature: Double,
+    val feelsLike: Double,
+    val conditionCode: Int,           // Код Yahoo/Chronus (0-47)
+    val description: String,
+    val humidity: Int,                // %
+    val windSpeed: Double,            // м/с
+    val windGust: Double?,            // м/с
+    val windDirection: Int,           // градусы
+    val pressure: Double,             // гПа
+    val visibility: Double?,          // км
+    val uvIndex: Double?,
+    val precipitationProb: Int?,      // %
+    val dewPoint: Double?,            // точка росы °C
+    val sunrise: Long,                // ms, 0 = нет данных
+    val sunset: Long,                 // ms, 0 = нет данных
+    val observationTime: Long,        // ms, время актуальности данных
+    val dailyForecast: List<DailyForecast>,
+    val hourlyForecast: List<HourlyForecast>
 )
 
 data class DailyForecast(
-    val date: Long,           // Дата (Unix timestamp ms, начало дня)
-    val tempMin: Double,      // Минимальная температура
-    val tempMax: Double,      // Максимальная температура
-    val conditionCode: Int,   // Код погоды (дневной)
-    val precipProb: Int       // Вероятность осадков (%)
+    val date: Long,           // начало локального дня, ms
+    val tempMin: Double,
+    val tempMax: Double,
+    val conditionCode: Int,
+    val precipProb: Int       // 0-100, -1 = нет данных
 )
 
 data class HourlyForecast(
-    val time: Long,           // Время (Unix timestamp ms)
-    val temp: Double,         // Температура
-    val conditionCode: Int,   // Код погоды
-    val precipProb: Int       // Вероятность осадков (%)
+    val time: Long,
+    val temp: Double,
+    val conditionCode: Int,
+    val precipProb: Int,      // 0-100, -1 = нет данных
+    val isDay: Boolean
 )
 
 /**
- * Базовый класс с общими утилитами для HTTP-запросов и парсинга.
+ * Общий HTTP-клиент (один на всё приложение — экономия памяти и соединений)
+ * и утилиты для провайдеров.
  */
 abstract class BaseWeatherProvider : WeatherProvider {
-    
-    protected suspend fun fetchJson(url: String, headers: Map<String, String> = emptyMap()): JSONObject? {
+
+    companion object {
+        val httpClient: OkHttpClient by lazy {
+            OkHttpClient.Builder()
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(20, TimeUnit.SECONDS)
+                .callTimeout(30, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(true)
+                .build()
+        }
+
+        /**
+         * Округление координат до 4 знаков.
+         * Требование MET Norway (5+ знаков = 403 Forbidden) и просто разумно:
+         * точность ~11 метров, погоду это не меняет, а кэш не плодит дубли.
+         */
+        fun roundCoord(value: Double): Double {
+            return String.format(Locale.US, "%.4f", value).toDouble()
+        }
+    }
+
+    /** GET-запрос, ответ — JSON-объект. null при любой ошибке. */
+    protected suspend fun fetchJson(
+        url: String,
+        headers: Map<String, String> = emptyMap()
+    ): JSONObject? {
+        val body = fetchBody(url, headers) ?: return null
+        return try {
+            JSONObject(body)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /** GET-запрос, ответ — JSON-массив (нужно для AviationWeather). */
+    protected suspend fun fetchJsonArray(
+        url: String,
+        headers: Map<String, String> = emptyMap()
+    ): JSONArray? {
+        val body = fetchBody(url, headers) ?: return null
+        return try {
+            JSONArray(body)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private suspend fun fetchBody(
+        url: String,
+        headers: Map<String, String>
+    ): String? {
         return withContext(Dispatchers.IO) {
             try {
-                val client = okhttp3.OkHttpClient()
-                val requestBuilder = okhttp3.Request.Builder().url(url)
-                headers.forEach { (key, value) -> requestBuilder.addHeader(key, value) }
-                
-                val response = client.newCall(requestBuilder.build()).execute()
-                if (!response.isSuccessful) {
-                    response.close()
-                    return@withContext null
+                val builder = Request.Builder().url(url)
+                headers.forEach { (k, v) -> builder.addHeader(k, v) }
+                httpClient.newCall(builder.build()).execute().use { response ->
+                    if (!response.isSuccessful) return@withContext null
+                    response.body?.string()?.takeIf { it.isNotBlank() }
                 }
-                
-                val body = response.body?.string()
-                response.close()
-                if (body.isNullOrEmpty()) return@withContext null
-                
-                JSONObject(body)
-            } catch (e: IOException) {
-                null
             } catch (e: Exception) {
                 null
             }
         }
     }
-    
-    /**
-     * Конвертация направления ветра из градусов в текстовое представление (опционально).
-     */
-    protected fun degreesToDirection(degrees: Int): String {
-        val directions = arrayOf("С", "СВ", "В", "ЮВ", "Ю", "ЮЗ", "З", "СЗ")
-        val index = ((degrees + 22.5) / 45.0).toInt() % 8
-        return directions[index]
+
+    /** Безопасное чтение Double из JSONObject (поля бывают строками или null). */
+    protected fun JSONObject.optDoubleOrNull(key: String): Double? {
+        if (isNull(key)) return null
+        val v = opt(key)
+        return when (v) {
+            is Number -> v.toDouble()
+            is String -> v.replace("+", "").trim().toDoubleOrNull()
+            else -> null
+        }
     }
 }
