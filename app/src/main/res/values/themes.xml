@@ -1,9 +1,53 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.AllClear" parent="Theme.Material3.Light.NoActionBar">
-        <item name="colorPrimary">@color/md_theme_light_primary</item>
-        <item name="colorOnPrimary">@color/md_theme_light_onPrimary</item>
-        <item name="colorSurface">@color/md_theme_light_surface</item>
-        <item name="colorOnSurface">@color/md_theme_light_onSurface</item>
+    <!-- Базовая тема. Сцену рисуем сами, поэтому фон окна тёмный нейтральный. -->
+    <style name="Theme.AllClear" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">#FF1A222C</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">#FF1A222C</item>
+        <item name="colorPrimary">@color/accent_blue</item>
+        <item name="colorSecondary">@color/accent_orange</item>
+    </style>
+
+    <!-- Крупная температура на сцене -->
+    <style name="TextAppearance.AllClear.BigTemp">
+        <item name="android:textSize">72sp</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="android:fontFamily">sans-serif-thin</item>
+    </style>
+
+    <style name="TextAppearance.AllClear.City">
+        <item name="android:textSize">22sp</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+
+    <style name="TextAppearance.AllClear.Condition">
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">@color/white</item>
+    </style>
+
+    <style name="TextAppearance.AllClear.Caption">
+        <item name="android:textSize">12sp</item>
+        <item name="android:textColor">@color/text_secondary_dark_bg</item>
+    </style>
+
+    <style name="TextAppearance.AllClear.CardHeader">
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">@color/card_header_text</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.05</item>
+    </style>
+
+    <style name="TextAppearance.AllClear.TileValue">
+        <item name="android:textSize">18sp</item>
+        <item name="android:textColor">@color/white</item>
+    </style>
+
+    <style name="TextAppearance.AllClear.TileLabel">
+        <item name="android:textSize">12sp</item>
+        <item name="android:textColor">@color/text_secondary_dark_bg</item>
     </style>
 </resources>
