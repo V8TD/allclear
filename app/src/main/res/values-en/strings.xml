@@ -49,6 +49,16 @@
     <string name="wind_gusts">Gusts</string>
     <string name="day_length_format">%1$d h %2$d min</string>
 
+    <string name="cond_clear">Clear</string>
+    <string name="cond_fair">Mostly clear</string>
+    <string name="cond_partly">Partly cloudy</string>
+    <string name="cond_overcast">Overcast</string>
+    <string name="cond_thunder">Thunderstorm</string>
+    <string name="cond_sleet">Sleet</string>
+    <string name="cond_rain">Rain</string>
+    <string name="cond_snow">Snow</string>
+    <string name="cond_fog">Fog</string>
+
     <string name="wind_dir_n">N</string>
     <string name="wind_dir_ne">NE</string>
     <string name="wind_dir_e">E</string>
