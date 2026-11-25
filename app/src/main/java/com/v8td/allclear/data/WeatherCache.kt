@@ -3,15 +3,14 @@ package com.v8td.allclear.data
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import java.io.IOException
 
 /**
- * Кэширование ответов погоды в JSON-файлы.
- * Файлы хранятся во внутреннем хранилище приложения.
- * Имя файла: cache_<provider>_<lat>_<lon>.json
- * Метаданные (timestamp) сохраняются внутри JSON.
+ * Кэш погоды в JSON-файлах внутреннего хранилища.
+ * Обновлён под новую модель: dewPoint, observationTime, isDay.
+ * Формат файла: { "_cache_timestamp": ..., "_cache_data": {...} }
  */
 class WeatherCache(private val context: Context) {
 
@@ -19,50 +18,40 @@ class WeatherCache(private val context: Context) {
         private const val CACHE_DIR = "weather_cache"
         private const val KEY_TIMESTAMP = "_cache_timestamp"
         private const val KEY_DATA = "_cache_data"
-        // Максимальный возраст кэша: 30 минут (для фоновых обновлений)
+
+        /** Обычный срок годности кэша — 30 минут. */
         const val MAX_CACHE_AGE_MS = 30 * 60 * 1000L
+
+        /** Предельный возраст «запасного» кэша при отсутствии сети — 6 часов. */
+        const val STALE_CACHE_AGE_MS = 6 * 60 * 60 * 1000L
     }
 
-    private fun getCacheDir(): File {
-        return File(context.filesDir, CACHE_DIR).apply { mkdirs() }
+    private fun cacheDir(): File =
+        File(context.filesDir, CACHE_DIR).apply { if (!exists()) mkdirs() }
+
+    private fun cacheFile(providerName: String, lat: Double, lon: Double): File {
+        // Округляем до 4 знаков — координаты «дрожат» на метры, кэш не должен плодиться
+        val la = BaseWeatherProvider.roundCoord(lat).toString().replace(".", "_").replace("-", "m")
+        val lo = BaseWeatherProvider.roundCoord(lon).toString().replace(".", "_").replace("-", "m")
+        val safeProvider = providerName.replace(Regex("[^A-Za-z0-9_]"), "_")
+        return File(cacheDir(), "cache_${safeProvider}_${la}_${lo}.json")
     }
 
-    private fun getCacheFile(providerName: String, lat: Double, lon: Double): File {
-        val safeLat = lat.toString().replace(".", "_")
-        val safeLon = lon.toString().replace(".", "_")
-        val fileName = "cache_${providerName}_${safeLat}_${safeLon}.json"
-        return File(getCacheDir(), fileName)
-    }
-
-    /**
-     * Сохранить данные в кэш.
-     * Оборачивает оригинальный JSON в объект с метаданными.
-     */
-    suspend fun save(
-        providerName: String,
-        lat: Double,
-        lon: Double,
-        weatherData: WeatherData
-    ) {
+    suspend fun save(providerName: String, lat: Double, lon: Double, data: WeatherData) {
         withContext(Dispatchers.IO) {
             try {
-                val file = getCacheFile(providerName, lat, lon)
                 val wrapper = JSONObject().apply {
                     put(KEY_TIMESTAMP, System.currentTimeMillis())
-                    put(KEY_DATA, weatherDataToJson(weatherData))
+                    put(KEY_DATA, toJson(data))
                 }
-                file.writeText(wrapper.toString())
-            } catch (e: IOException) {
-                // Тихо игнорируем ошибки записи — кэш необязателен
+                cacheFile(providerName, lat, lon).writeText(wrapper.toString())
+            } catch (e: Exception) {
+                // Кэш необязателен — ошибки записи не роняют приложение
             }
         }
     }
 
-    /**
-     * Загрузить данные из кэша.
-     * Возвращает null если кэш отсутствует, повреждён или устарел.
-     * @param maxAgeMs максимальный возраст кэша, по умолчанию MAX_CACHE_AGE_MS
-     */
+    /** Загрузка кэша не старше maxAgeMs. null если нет/просрочен/повреждён. */
     suspend fun load(
         providerName: String,
         lat: Double,
@@ -71,163 +60,144 @@ class WeatherCache(private val context: Context) {
     ): WeatherData? {
         return withContext(Dispatchers.IO) {
             try {
-                val file = getCacheFile(providerName, lat, lon)
+                val file = cacheFile(providerName, lat, lon)
                 if (!file.exists()) return@withContext null
-
-                val content = file.readText()
-                val wrapper = JSONObject(content)
-                val timestamp = wrapper.getLong(KEY_TIMESTAMP)
-                val age = System.currentTimeMillis() - timestamp
-
-                if (age > maxAgeMs) return@withContext null
-
-                val dataJson = wrapper.getJSONObject(KEY_DATA)
-                jsonToWeatherData(dataJson)
+                val wrapper = JSONObject(file.readText())
+                val age = System.currentTimeMillis() - wrapper.getLong(KEY_TIMESTAMP)
+                if (age > maxAgeMs || age < 0) return@withContext null
+                fromJson(wrapper.getJSONObject(KEY_DATA))
             } catch (e: Exception) {
                 null
             }
         }
     }
 
-    /**
-     * Проверить наличие актуального кэша без парсинга данных.
-     */
-    suspend fun hasValidCache(
-        providerName: String,
-        lat: Double,
-        lon: Double,
-        maxAgeMs: Long = MAX_CACHE_AGE_MS
-    ): Boolean {
+    /** Возраст кэша в мс, или null если кэша нет. Для подписи «обновлено N мин назад». */
+    suspend fun ageMs(providerName: String, lat: Double, lon: Double): Long? {
         return withContext(Dispatchers.IO) {
             try {
-                val file = getCacheFile(providerName, lat, lon)
-                if (!file.exists()) return@withContext false
-                val content = file.readText()
-                val timestamp = JSONObject(content).getLong(KEY_TIMESTAMP)
-                (System.currentTimeMillis() - timestamp) <= maxAgeMs
+                val file = cacheFile(providerName, lat, lon)
+                if (!file.exists()) return@withContext null
+                val ts = JSONObject(file.readText()).getLong(KEY_TIMESTAMP)
+                System.currentTimeMillis() - ts
             } catch (e: Exception) {
-                false
+                null
             }
         }
     }
 
-    /**
-     * Очистить весь кэш.
-     */
     suspend fun clearAll() {
         withContext(Dispatchers.IO) {
-            getCacheDir().deleteRecursively()
+            try { cacheDir().deleteRecursively() } catch (e: Exception) { }
         }
     }
 
-    /**
-     * Очистить кэш конкретного провайдера.
-     */
     suspend fun clearProvider(providerName: String) {
         withContext(Dispatchers.IO) {
-            getCacheDir().listFiles()?.filter {
-                it.name.startsWith("cache_${providerName}_")
-            }?.forEach { it.delete() }
+            try {
+                val safe = providerName.replace(Regex("[^A-Za-z0-9_]"), "_")
+                cacheDir().listFiles()
+                    ?.filter { it.name.startsWith("cache_${safe}_") }
+                    ?.forEach { it.delete() }
+            } catch (e: Exception) { }
         }
     }
 
-    // --- Сериализация WeatherData в JSON ---
+    // --- Сериализация ---
 
-    private fun weatherDataToJson(data: WeatherData): JSONObject {
-        return JSONObject().apply {
-            put("temperature", data.temperature)
-            put("feelsLike", data.feelsLike)
-            put("conditionCode", data.conditionCode)
-            put("description", data.description)
-            put("humidity", data.humidity)
-            put("windSpeed", data.windSpeed)
-            put("windGust", data.windGust ?: JSONObject.NULL)
-            put("windDirection", data.windDirection)
-            put("pressure", data.pressure)
-            put("visibility", data.visibility ?: JSONObject.NULL)
-            put("uvIndex", data.uvIndex ?: JSONObject.NULL)
-            put("precipitationProb", data.precipitationProb ?: JSONObject.NULL)
-            put("sunrise", data.sunrise)
-            put("sunset", data.sunset)
-
-            val dailyArr = org.json.JSONArray()
-            data.dailyForecast.forEach { d ->
-                dailyArr.put(JSONObject().apply {
-                    put("date", d.date)
-                    put("tempMin", d.tempMin)
-                    put("tempMax", d.tempMax)
-                    put("conditionCode", d.conditionCode)
-                    put("precipProb", d.precipProb)
+    private fun toJson(d: WeatherData): JSONObject = JSONObject().apply {
+        put("temperature", d.temperature)
+        put("feelsLike", d.feelsLike)
+        put("conditionCode", d.conditionCode)
+        put("description", d.description)
+        put("humidity", d.humidity)
+        put("windSpeed", d.windSpeed)
+        put("windGust", d.windGust ?: JSONObject.NULL)
+        put("windDirection", d.windDirection)
+        put("pressure", d.pressure)
+        put("visibility", d.visibility ?: JSONObject.NULL)
+        put("uvIndex", d.uvIndex ?: JSONObject.NULL)
+        put("precipitationProb", d.precipitationProb ?: JSONObject.NULL)
+        put("dewPoint", d.dewPoint ?: JSONObject.NULL)
+        put("sunrise", d.sunrise)
+        put("sunset", d.sunset)
+        put("observationTime", d.observationTime)
+        put("dailyForecast", JSONArray().apply {
+            d.dailyForecast.forEach { f ->
+                put(JSONObject().apply {
+                    put("date", f.date)
+                    put("tempMin", f.tempMin)
+                    put("tempMax", f.tempMax)
+                    put("conditionCode", f.conditionCode)
+                    put("precipProb", f.precipProb)
                 })
             }
-            put("dailyForecast", dailyArr)
-
-            val hourlyArr = org.json.JSONArray()
-            data.hourlyForecast.forEach { h ->
-                hourlyArr.put(JSONObject().apply {
-                    put("time", h.time)
-                    put("temp", h.temp)
-                    put("conditionCode", h.conditionCode)
-                    put("precipProb", h.precipProb)
+        })
+        put("hourlyForecast", JSONArray().apply {
+            d.hourlyForecast.forEach { f ->
+                put(JSONObject().apply {
+                    put("time", f.time)
+                    put("temp", f.temp)
+                    put("conditionCode", f.conditionCode)
+                    put("precipProb", f.precipProb)
+                    put("isDay", f.isDay)
                 })
             }
-            put("hourlyForecast", hourlyArr)
-        }
+        })
     }
 
-    // --- Десериализация JSON в WeatherData ---
-
-    private fun jsonToWeatherData(json: JSONObject): WeatherData {
-        val dailyList = mutableListOf<DailyForecast>()
-        val dailyArr = json.getJSONArray("dailyForecast")
-        for (i in 0 until dailyArr.length()) {
-            val d = dailyArr.getJSONObject(i)
-            dailyList.add(DailyForecast(
-                date = d.getLong("date"),
-                tempMin = d.getDouble("tempMin"),
-                tempMax = d.getDouble("tempMax"),
-                conditionCode = d.getInt("conditionCode"),
-                precipProb = d.getInt("precipProb")
-            ))
+    private fun fromJson(j: JSONObject): WeatherData {
+        val daily = mutableListOf<DailyForecast>()
+        j.optJSONArray("dailyForecast")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                daily.add(DailyForecast(
+                    date = o.getLong("date"),
+                    tempMin = o.getDouble("tempMin"),
+                    tempMax = o.getDouble("tempMax"),
+                    conditionCode = o.getInt("conditionCode"),
+                    precipProb = o.optInt("precipProb", -1)
+                ))
+            }
         }
-
-        val hourlyList = mutableListOf<HourlyForecast>()
-        val hourlyArr = json.getJSONArray("hourlyForecast")
-        for (i in 0 until hourlyArr.length()) {
-            val h = hourlyArr.getJSONObject(i)
-            hourlyList.add(HourlyForecast(
-                time = h.getLong("time"),
-                temp = h.getDouble("temp"),
-                conditionCode = h.getInt("conditionCode"),
-                precipProb = h.getInt("precipProb")
-            ))
+        val hourly = mutableListOf<HourlyForecast>()
+        j.optJSONArray("hourlyForecast")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                hourly.add(HourlyForecast(
+                    time = o.getLong("time"),
+                    temp = o.getDouble("temp"),
+                    conditionCode = o.getInt("conditionCode"),
+                    precipProb = o.optInt("precipProb", -1),
+                    isDay = o.optBoolean("isDay", true)
+                ))
+            }
         }
-
         return WeatherData(
-            temperature = json.getDouble("temperature"),
-            feelsLike = json.getDouble("feelsLike"),
-            conditionCode = json.getInt("conditionCode"),
-            description = json.getString("description"),
-            humidity = json.getInt("humidity"),
-            windSpeed = json.getDouble("windSpeed"),
-            windGust = json.optDouble("windGust", Double.NaN).let {
-                if (it.isNaN()) null else it
-            },
-            windDirection = json.getInt("windDirection"),
-            pressure = json.getDouble("pressure"),
-            visibility = json.optDouble("visibility", Double.NaN).let {
-                if (it.isNaN()) null else it
-            },
-            uvIndex = json.optDouble("uvIndex", Double.NaN).let {
-                if (it.isNaN()) null else it
-            },
-            precipitationProb = json.optInt("precipitationProb", -1).let {
-                if (it < 0) null else it
-            },
-            sunrise = json.getLong("sunrise"),
-            sunset = json.getLong("sunset"),
-            dailyForecast = dailyList,
-            hourlyForecast = hourlyList
+            temperature = j.getDouble("temperature"),
+            feelsLike = j.getDouble("feelsLike"),
+            conditionCode = j.getInt("conditionCode"),
+            description = j.getString("description"),
+            humidity = j.getInt("humidity"),
+            windSpeed = j.getDouble("windSpeed"),
+            windGust = nullableDouble(j, "windGust"),
+            windDirection = j.getInt("windDirection"),
+            pressure = j.getDouble("pressure"),
+            visibility = nullableDouble(j, "visibility"),
+            uvIndex = nullableDouble(j, "uvIndex"),
+            precipitationProb = j.optInt("precipitationProb", -1).let { if (it < 0) null else it },
+            dewPoint = nullableDouble(j, "dewPoint"),
+            sunrise = j.getLong("sunrise"),
+            sunset = j.getLong("sunset"),
+            observationTime = j.optLong("observationTime", 0L),
+            dailyForecast = daily,
+            hourlyForecast = hourly
         )
+    }
+
+    private fun nullableDouble(j: JSONObject, key: String): Double? {
+        if (!j.has(key) || j.isNull(key)) return null
+        val v = j.optDouble(key, Double.NaN)
+        return if (v.isNaN()) null else v
     }
 }
