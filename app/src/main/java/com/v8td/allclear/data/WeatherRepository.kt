@@ -1,103 +1,51 @@
 package com.v8td.allclear.data
 
 import android.content.Context
-import android.content.SharedPreferences
-import androidx.core.content.edit
+import com.v8td.allclear.util.AppSettings
 
 /**
- * Репозиторий погоды.
- * Единая точка доступа к данным: кэш → сеть → сохранение в кэш.
- * Управляет выбором провайдера и обработкой ошибок.
+ * Репозиторий погоды — единая точка получения данных.
+ * Логика: свежий кэш → сеть → сохранение → при неудаче устаревший кэш.
+ * MET Norway в фоне автоматически заменяется на Open-Meteo (правила API).
+ * METAR не даёт прогноз — прогноз долистывается от Open-Meteo.
  */
-class WeatherRepository(private val context: Context) {
+class WeatherRepository(context: Context) {
 
     companion object {
-        private const val PREFS_NAME = "allclear_weather_prefs"
-        private const val KEY_PROVIDER = "selected_provider"
-        private const val KEY_OWM_API_KEY = "owm_api_key"
-        private const val KEY_METAR_ICAO = "metar_icao"
-        private const val KEY_LAST_ERROR = "last_error_message"
-        private const val KEY_LAST_UPDATE_TIME = "last_update_time"
-
         const val PROVIDER_OPEN_METEO = "open_meteo"
         const val PROVIDER_MET_NORWAY = "met_norway"
         const val PROVIDER_METAR = "metar"
         const val PROVIDER_OWM = "owm"
     }
 
-    private val prefs: SharedPreferences =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-
+    private val settings = AppSettings(context)
     private val cache = WeatherCache(context)
 
-    /**
-     * Получить текущего провайдера.
-     */
-    fun getSelectedProviderId(): String {
-        return prefs.getString(KEY_PROVIDER, PROVIDER_OPEN_METEO) ?: PROVIDER_OPEN_METEO
-    }
+    fun getSelectedProviderId(): String = settings.providerId
 
-    /**
-     * Установить активного провайдера.
-     */
     fun setSelectedProvider(providerId: String) {
-        prefs.edit { putString(KEY_PROVIDER, providerId) }
+        settings.providerId = providerId
+    }
+
+    fun setOwmApiKey(key: String) { settings.owmApiKey = key }
+    fun getOwmApiKey(): String = settings.owmApiKey
+    fun setMetarIcao(icao: String) { settings.metarIcao = icao }
+    fun getMetarIcao(): String = settings.metarIcao
+    fun getLastError(): String? = settings.lastError
+    fun getLastUpdateTime(): Long = settings.lastUpdateTime
+
+    fun createProvider(providerId: String): WeatherProvider = when (providerId) {
+        PROVIDER_OPEN_METEO -> OpenMeteoProvider()
+        PROVIDER_MET_NORWAY -> MetNorwayProvider()
+        PROVIDER_METAR -> MetarProvider()
+        PROVIDER_OWM -> OpenWeatherMapProvider(getOwmApiKey())
+        else -> OpenMeteoProvider()
     }
 
     /**
-     * Сохранить API-ключ OWM.
-     */
-    fun setOwmApiKey(key: String) {
-        prefs.edit { putString(KEY_OWM_API_KEY, key) }
-    }
-
-    fun getOwmApiKey(): String {
-        return prefs.getString(KEY_OWM_API_KEY, "") ?: ""
-    }
-
-    /**
-     * Сохранить ручной ICAO-код для METAR.
-     */
-    fun setMetarIcao(icao: String) {
-        prefs.edit { putString(KEY_METAR_ICAO, icao) }
-    }
-
-    fun getMetarIcao(): String {
-        return prefs.getString(KEY_METAR_ICAO, "") ?: ""
-    }
-
-    /**
-     * Получить последнее сообщение об ошибке (для отображения в UI).
-     */
-    fun getLastError(): String? {
-        return prefs.getString(KEY_LAST_ERROR, null)
-    }
-
-    /**
-     * Получить время последнего успешного обновления (ms).
-     */
-    fun getLastUpdateTime(): Long {
-        return prefs.getLong(KEY_LAST_UPDATE_TIME, 0L)
-    }
-
-    /**
-     * Создать экземпляр провайдера по ID.
-     */
-    fun createProvider(providerId: String): WeatherProvider {
-        return when (providerId) {
-            PROVIDER_OPEN_METEO -> OpenMeteoProvider()
-            PROVIDER_MET_NORWAY -> MetNorwayProvider()
-            PROVIDER_METAR -> MetarProvider()
-            PROVIDER_OWM -> OpenWeatherMapProvider(getOwmApiKey())
-            else -> OpenMeteoProvider()
-        }
-    }
-
-    /**
-     * Основной метод получения погоды.
-     * Логика: кэш → сеть → сохранение.
-     * @param forceRefresh игнорировать кэш (при ручном обновлении)
-     * @param isBackground true если вызов из WorkManager (MET Norway запрещён)
+     * Получить погоду.
+     * @param forceRefresh true при ручном обновлении (игнорирует свежий кэш)
+     * @param isBackground true при вызове из WorkManager
      */
     suspend fun getWeather(
         lat: Double,
@@ -105,81 +53,84 @@ class WeatherRepository(private val context: Context) {
         forceRefresh: Boolean = false,
         isBackground: Boolean = false
     ): Result<WeatherData> {
-        val providerId = getSelectedProviderId()
+        val selected = getSelectedProviderId()
 
-        // MET Norway запрещён в фоне по правилам от 05.11.2026
-        val effectiveProviderId = if (isBackground && providerId == PROVIDER_MET_NORWAY) {
+        // MET Norway запрещён в фоне — тихо подменяем
+        val effectiveId = if (isBackground && selected == PROVIDER_MET_NORWAY) {
             PROVIDER_OPEN_METEO
-        } else {
-            providerId
+        } else selected
+
+        // OWM без ключа работать не может — сразу понятная ошибка
+        if (effectiveId == PROVIDER_OWM && getOwmApiKey().isBlank()) {
+            settings.lastError = "OpenWeatherMap: не задан API-ключ"
+            return Result.failure(IllegalStateException("OWM API key missing"))
         }
 
-        // METAR: если есть ручной ICAO, используем его вместо координат
-        if (effectiveProviderId == PROVIDER_METAR) {
-            val icao = getMetarIcao()
-            if (icao.isNotBlank()) {
-                val metarProvider = MetarProvider()
-                val data = metarProvider.getWeatherByIcao(icao)
-                if (data != null) {
-                    cache.save(effectiveProviderId, lat, lon, data)
-                    saveSuccessState()
-                    return Result.success(data)
-                }
-                saveErrorState("METAR: станция $icao недоступна")
-                return Result.failure(Exception("METAR station unavailable"))
-            }
-            // Если ICAO пустой — используем автопоиск по координатам ниже
-        }
-
-        // Проверяем кэш (если не принудительное обновление)
+        // Свежий кэш (если не принудительное обновление)
         if (!forceRefresh) {
-            val cached = cache.load(effectiveProviderId, lat, lon)
-            if (cached != null) {
-                return Result.success(cached)
+            cache.load(effectiveId, lat, lon)?.let {
+                return Result.success(it)
             }
         }
 
-        // Запрос к сети
-        val provider = createProvider(effectiveProviderId)
-        val data = provider.getWeather(lat, lon)
+        // Сеть
+        val data = fetchFromNetwork(effectiveId, lat, lon)
 
         if (data != null) {
-            cache.save(effectiveProviderId, lat, lon, data)
-            saveSuccessState()
+            cache.save(effectiveId, lat, lon, data)
+            settings.lastUpdateTime = System.currentTimeMillis()
+            settings.lastError = null
             return Result.success(data)
         }
 
-        // Если сеть упала, пробуем отдать устаревший кэш
-        val staleCache = cache.load(
-            effectiveProviderId, lat, lon,
-            maxAgeMs = WeatherCache.MAX_CACHE_AGE_MS * 4 // До 2 часов
-        )
-        if (staleCache != null) {
-            saveErrorState("Нет сети, показаны устаревшие данные")
-            return Result.success(staleCache)
+        // Сеть не дала данных — пробуем устаревший кэш (до 6 часов)
+        cache.load(effectiveId, lat, lon, WeatherCache.STALE_CACHE_AGE_MS)?.let { stale ->
+            settings.lastError = "Нет свежих данных, показаны сохранённые"
+            return Result.success(stale)
         }
 
-        saveErrorState("Не удалось получить данные от ${provider.name}")
-        return Result.failure(Exception("Weather fetch failed from ${provider.name}"))
+        val providerName = createProvider(effectiveId).name
+        settings.lastError = "Не удалось получить данные ($providerName)"
+        return Result.failure(Exception("Weather fetch failed: $providerName"))
     }
 
-    /**
-     * Очистить кэш (например, при смене провайдера).
-     */
-    suspend fun clearCache() {
-        cache.clearAll()
-    }
+    /** Сетевой запрос с учётом особенностей провайдеров. */
+    private suspend fun fetchFromNetwork(
+        providerId: String,
+        lat: Double,
+        lon: Double
+    ): WeatherData? {
+        if (providerId == PROVIDER_METAR) {
+            val metar = MetarProvider()
+            val icao = getMetarIcao()
+            val current = if (icao.isNotBlank()) {
+                metar.getWeatherByIcao(icao)
+            } else {
+                metar.getWeather(lat, lon)
+            } ?: return null
 
-    private fun saveSuccessState() {
-        prefs.edit {
-            putLong(KEY_LAST_UPDATE_TIME, System.currentTimeMillis())
-            remove(KEY_LAST_ERROR)
+            // У METAR нет прогноза — берём его у Open-Meteo (без ключа, всегда доступен).
+            // Если Open-Meteo недоступен, отдаём METAR как есть (плитки покажут прочерки).
+            val forecast = OpenMeteoProvider().getWeather(lat, lon)
+            return if (forecast != null) {
+                current.copy(
+                    dailyForecast = forecast.dailyForecast,
+                    hourlyForecast = forecast.hourlyForecast,
+                    sunrise = forecast.sunrise,
+                    sunset = forecast.sunset,
+                    uvIndex = current.uvIndex ?: forecast.uvIndex
+                )
+            } else current
         }
+
+        return createProvider(providerId).getWeather(lat, lon)
     }
 
-    private fun saveErrorState(message: String) {
-        prefs.edit {
-            putString(KEY_LAST_ERROR, message)
-        }
+    suspend fun clearCache() = cache.clearAll()
+
+    /** Возраст кэша текущего провайдера для подписи в UI. */
+    suspend fun cacheAgeMs(lat: Double, lon: Double): Long? {
+        val id = getSelectedProviderId()
+        return cache.ageMs(id, lat, lon)
     }
 }
