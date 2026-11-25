@@ -352,7 +352,6 @@ class WeatherSceneView @JvmOverloads constructor(
         }
     }
 
-    private fun drawRain(canvas: Canvas, w: Int.toFloatPlaceholder, h: Float, dt: Float) { }
 
     private fun drawRain(canvas: Canvas, w: Float, h: Float, dt: Float) {
         // Наклон штрихов зависит от ветра
