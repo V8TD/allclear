@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Базовая тема. Сцену рисуем сами, поэтому фон окна тёмный нейтральный. -->
+    <!-- Базовая тема приложения -->
     <style name="Theme.AllClear" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">#FF1A222C</item>
@@ -17,22 +17,26 @@
         <item name="android:fontFamily">sans-serif-thin</item>
     </style>
 
+    <!-- Название города -->
     <style name="TextAppearance.AllClear.City">
         <item name="android:textSize">22sp</item>
         <item name="android:textColor">@color/white</item>
         <item name="android:fontFamily">sans-serif-medium</item>
     </style>
 
+    <!-- Описание погоды (пасмурно, дождь...) -->
     <style name="TextAppearance.AllClear.Condition">
         <item name="android:textSize">16sp</item>
         <item name="android:textColor">@color/white</item>
     </style>
 
+    <!-- Мелкие подписи (дата, подпись «обновлено...») -->
     <style name="TextAppearance.AllClear.Caption">
         <item name="android:textSize">12sp</item>
         <item name="android:textColor">@color/text_secondary_dark_bg</item>
     </style>
 
+    <!-- Заголовки карточек (ПОЧАСОВОЙ ПРОГНОЗ, ПОДРОБНОСТИ...) -->
     <style name="TextAppearance.AllClear.CardHeader">
         <item name="android:textSize">13sp</item>
         <item name="android:textColor">@color/card_header_text</item>
@@ -41,11 +45,13 @@
         <item name="android:letterSpacing">0.05</item>
     </style>
 
+    <!-- Значения в плитках деталей (3 м/с, 86%...) -->
     <style name="TextAppearance.AllClear.TileValue">
         <item name="android:textSize">18sp</item>
         <item name="android:textColor">@color/white</item>
     </style>
 
+    <!-- Названия плиток деталей (Ветер, Влажность...) -->
     <style name="TextAppearance.AllClear.TileLabel">
         <item name="android:textSize">12sp</item>
         <item name="android:textColor">@color/text_secondary_dark_bg</item>
