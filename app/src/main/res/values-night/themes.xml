@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Ночная тема: сцена сама рисует ночную палитру, окно ещё темнее. -->
+    <style name="Theme.AllClear" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">#FF0D1B2A</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">#FF0D1B2A</item>
+        <item name="colorPrimary">@color/accent_blue</item>
+        <item name="colorSecondary">@color/accent_orange</item>
+    </style>
+</resources>
