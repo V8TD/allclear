@@ -2,7 +2,6 @@ package com.v8td.allclear.data
 
 import org.json.JSONObject
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Locale
 import java.util.TimeZone
 
@@ -13,12 +12,6 @@ import java.util.TimeZone
  * В фоне (WorkManager) репозиторий подменяет его на Open-Meteo.
  * Координаты — максимум 4 знака после запятой (иначе 403).
  * Атрибуция: CC BY 4.0.
- *
- * Исправлено в ревизии:
- * - «Ощущается как» берётся готовым (apparent_air_temperature), самопальная формула удалена.
- * - Добавлены точка росы и УФ-индекс (clear sky).
- * - Дневной прогноз группируется по 6-часовым блокам (air_temperature_min/max),
- *   а не по мгновенным значениям — мин/макс точнее.
  */
 class MetNorwayProvider : BaseWeatherProvider() {
 
@@ -40,7 +33,7 @@ class MetNorwayProvider : BaseWeatherProvider() {
         }
     }
 
-    private fun parseResponse(json: JSONObject): WeatherData {
+    private fun parseResponse(json: JSONObject): WeatherData? {
         val properties = json.getJSONObject("properties")
         val timeseries = properties.getJSONArray("timeseries")
         if (timeseries.length() == 0) return null
@@ -138,7 +131,6 @@ class MetNorwayProvider : BaseWeatherProvider() {
 
         val dailyList = dayMap.entries.take(8).mapNotNull { (dateStr, agg) ->
             if (agg.min == Double.MAX_VALUE) return@mapNotNull null
-            // День берём «дневной» символ: если есть дневные варианты — доминирующий среди них
             val dominant = agg.codes.groupingBy { it }.eachCount()
                 .maxByOrNull { it.value }?.key ?: 3200
             DailyForecast(
