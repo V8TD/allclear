@@ -37,6 +37,8 @@ class WeatherSceneView @JvmOverloads constructor(
         private const val RAIN_COUNT = 70
         private const val SNOW_COUNT = 50
         private const val STAR_COUNT = 40
+        // Коды Yahoo/Chronus, которые показываем как грозу (0-2 — торнадо/шторм/ураган)
+        private val THUNDER_CODES = intArrayOf(0, 1, 2, 3, 4, 35, 37, 38, 39, 45, 47)
     }
 
     // --- Состояние погоды ---
@@ -236,10 +238,7 @@ class WeatherSceneView @JvmOverloads constructor(
 
     // --- Группы погоды по кодам Yahoo/Chronus ---
 
-    private fun isThunder(): Boolean = conditionCode in intArrayOf(0, 1, 2, 3, 4, 35, 37, 38, 39, 45, 47).let { arr ->
-        // 0-2 (торнадо/шторм/ураган) тоже показываем как грозу
-        arr.contains(conditionCode)
-    }
+    private fun isThunder(): Boolean = conditionCode in THUNDER_CODES
     private fun isRain(): Boolean = conditionCode in 5..12 || conditionCode == 17 || conditionCode == 18 || conditionCode == 40
     private fun isSnow(): Boolean = conditionCode in 13..16 || conditionCode in 41..43 || conditionCode == 46
     private fun isFog(): Boolean = conditionCode in 19..22
@@ -247,7 +246,6 @@ class WeatherSceneView @JvmOverloads constructor(
 
     private fun applyPalette() {
         val night = !isDay
-        val res = context.resources
         fun c(id: Int) = ContextCompat.getColor(context, id)
 
         when {
@@ -352,7 +350,6 @@ class WeatherSceneView @JvmOverloads constructor(
         }
     }
 
-
     private fun drawRain(canvas: Canvas, w: Float, h: Float, dt: Float) {
         // Наклон штрихов зависит от ветра
         val slant = (windMs.toFloat().coerceIn(0f, 15f) / 15f) * 14f *
@@ -453,8 +450,7 @@ class WeatherSceneView @JvmOverloads constructor(
 
         canvas.drawLine(baseX, baseY, baseX, topY, polePaint)
 
-        // Стрелка в плоскости экрана: 0° (север) — вверх-вправо условно,
-        // восток (90°) — вправо, юг (180°) — вниз-влево, запад (270°) — влево.
+        // Стрелка в плоскости экрана: восток (90°) — вправо, запад (270°) — влево.
         // Проекция: горизонтальная составляющая = sin(направление).
         val horizontal = sin(Math.toRadians(windDirDeg.toDouble())).toFloat()
         val len = h * 0.05f
