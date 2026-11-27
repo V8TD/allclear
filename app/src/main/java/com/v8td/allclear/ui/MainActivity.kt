@@ -24,10 +24,10 @@ import kotlinx.coroutines.launch
 
 /**
  * Главный экран: страницы городов (свайп), потянуть-обновить, живая сцена.
- * Первый запуск: разрешение геолокации → координаты → город → погода.
  *
- * Исправлено: убран костыль включения/выключения swipe-refresh —
- * со NestedScrollView он работает штатно и не дёргает контент.
+ * Обновление «потянуть вниз»: SwipeRefresh всегда включён, а решение
+ * «тянуть обновление или скроллить контент» принимает штатный callback
+ * canChildScrollUp — без переключений посреди жеста (это вызывало застревание).
  */
 class MainActivity : AppCompatActivity() {
 
@@ -70,7 +70,6 @@ class MainActivity : AppCompatActivity() {
                 adapter.setActivePage(position, resumed)
                 updateIndicator(position)
                 loadWeatherForPage(position)
-                // Предзагрузка соседней страницы — свайп будет мгновенным
                 loadWeatherForPage(position + 1)
                 loadWeatherForPage(position - 1)
             }
@@ -82,6 +81,11 @@ class MainActivity : AppCompatActivity() {
         binding.swipeRefresh.setProgressBackgroundColorSchemeColor(
             ContextCompat.getColor(this, R.color.card_background)
         )
+        // Штатный механизм: если страница может скроллиться вверх — жест уходит контенту,
+        // если страница в самом верху — жест запускает обновление.
+        binding.swipeRefresh.setOnChildScrollUpCallback { _, _ ->
+            adapter.canCurrentPageScrollUp()
+        }
         binding.swipeRefresh.setOnRefreshListener {
             refreshCurrent(force = true)
         }
@@ -105,7 +109,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Фоновые обновления по расписанию
         WorkScheduler.schedule(this)
 
         lifecycleScope.launch {
@@ -159,10 +162,14 @@ class MainActivity : AppCompatActivity() {
         binding.emptyHint.visibility = View.VISIBLE
     }
 
-    /** Загрузка погоды для страницы (кэш отдаётся мгновенно, сеть при устаревании). */
+    /** Загрузка погоды для страницы. */
     private fun loadWeatherForPage(position: Int, force: Boolean = false) {
         val city = adapter.getCity(position) ?: return
-        if (loadJobs[city.id]?.isActive == true && !force) return
+        val existing = loadJobs[city.id]
+        if (existing?.isActive == true) {
+            if (!force) return
+            existing.cancel() // принудительное обновление заменяет текущий запрос
+        }
         loadJobs[city.id] = lifecycleScope.launch {
             val result = repository.getWeather(city.lat, city.lon, forceRefresh = force)
             val data: WeatherData? = result.getOrNull()
@@ -179,12 +186,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshCurrent(force: Boolean) {
-        binding.swipeRefresh.isRefreshing = true
         val position = binding.cityPager.currentItem
         if (adapter.getCity(position) == null) {
             binding.swipeRefresh.isRefreshing = false
             return
         }
+        binding.swipeRefresh.isRefreshing = true
         loadWeatherForPage(position, force)
     }
 
@@ -212,13 +219,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // --- Жизненный цикл: анимация сцены только на видимой странице ---
+    // --- Жизненный цикл ---
 
     override fun onResume() {
         super.onResume()
         resumed = true
         adapter.setActivePage(binding.cityPager.currentItem, true)
-        // Данные могли обновиться воркером, пока приложение спало
         loadWeatherForPage(binding.cityPager.currentItem)
     }
 
