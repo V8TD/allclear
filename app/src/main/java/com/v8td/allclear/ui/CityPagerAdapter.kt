@@ -16,10 +16,8 @@ import java.util.Calendar
 
 /**
  * Страницы городов для ViewPager2.
- * Каждая страница: живая сцена + шапка + широкие карточки прогнозов и деталей.
- *
- * Исправлено: убран слушатель скролла для swipe-refresh —
- * NestedScrollView协调ирует жесты со SwipeRefreshLayout сам.
+ * Стабильные ID — страницы не пересоздаются при обновлении данных,
+ * позиция прокрутки не сбрасывается.
  */
 class CityPagerAdapter(
     private val context: Context
@@ -30,6 +28,10 @@ class CityPagerAdapter(
     private val holders = mutableMapOf<Int, PageHolder>()
     private var activePosition = 0
     private var resumed = false
+
+    init {
+        setHasStableIds(true)
+    }
 
     fun submitCities(list: List<City>) {
         cities.clear()
@@ -43,6 +45,12 @@ class CityPagerAdapter(
         weatherMap[cityId] = data
         val index = cities.indexOfFirst { it.id == cityId }
         if (index >= 0) notifyItemChanged(index)
+    }
+
+    /** Может ли текущая страница прокручиваться вверх (для SwipeRefresh). */
+    fun canCurrentPageScrollUp(): Boolean {
+        val holder = holders[activePosition] ?: return false
+        return holder.binding.scrollContent.canScrollVertically(-1)
     }
 
     /** Какая страница видима и активно ли приложение — управляет анимацией сцен. */
