@@ -8,14 +8,6 @@ import kotlin.math.pow
  * Провайдер AviationWeather METAR — только ТЕКУЩАЯ погода, без прогноза.
  * Ответ API — JSON-массив (не объект!). Лимит 100 запросов/мин.
  * Поиск ближайшей станции: /api/data/stationinfo?bbox=... (координаты — 3 знака).
- *
- * Исправлено в ревизии:
- * - Ответ парсится как массив.
- * - Правильный эндпоинт stationinfo + bbox вместо выдуманного station?lat&lon.
- * - Давление altim приходит уже в гПа — конвертация убрана.
- * - Видимость бывает строкой "6+" — парсится вручную.
- * - Категория называется fltCat (не flightCategory).
- * - Направление ветра бывает "VRB" — обработано.
  */
 class MetarProvider : BaseWeatherProvider() {
 
@@ -56,7 +48,7 @@ class MetarProvider : BaseWeatherProvider() {
             val lat0 = fmt3(lat - radiusDeg)
             val lat1 = fmt3(lat + radiusDeg)
             // Поправка на сжатие меридианов к полюсам
-            val lonDelta = radiusDeg / kotlin.math.maxOf(0.2, kotlin.math.cos(Math.toRadians(lat)))
+            val lonDelta = radiusDeg / kotlin.math.max(0.2, kotlin.math.cos(Math.toRadians(lat)))
             val lon0 = fmt3(lon - lonDelta)
             val lon1 = fmt3(lon + lonDelta)
 
@@ -94,7 +86,7 @@ class MetarProvider : BaseWeatherProvider() {
     private fun fmt3(v: Double): String = String.format(java.util.Locale.US, "%.3f", v)
 
     private fun parseMetar(m: JSONObject): WeatherData {
-        val temp = m.optDoubleOrNull("temp") ?: return throw IllegalStateException("no temp")
+        val temp = m.optDoubleOrNull("temp") ?: throw IllegalStateException("no temp")
         val dewp = m.optDoubleOrNull("dewp")
 
         // Ветер: узлы -> м/с. wdir может быть числом, строкой "VRB" или null.
