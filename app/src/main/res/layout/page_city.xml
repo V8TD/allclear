@@ -1,15 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="#FF141C26">
 
-    <!-- Живая сцена: фон всей страницы -->
+    <!-- Живая сцена: только верхняя часть страницы -->
     <com.v8td.allclear.ui.WeatherSceneView
         android:id="@+id/sceneView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="420dp"
+        android:layout_gravity="top" />
 
-    <ScrollView
+    <androidx.core.widget.NestedScrollView
         android:id="@+id/scrollContent"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -367,5 +369,5 @@
                 android:textAppearance="@style/TextAppearance.AllClear.Caption" />
 
         </LinearLayout>
-    </ScrollView>
+    </androidx.core.widget.NestedScrollView>
 </FrameLayout>
