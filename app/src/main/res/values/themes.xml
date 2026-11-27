@@ -10,30 +10,34 @@
         <item name="colorSecondary">@color/accent_orange</item>
     </style>
 
+    <!-- Базовый стиль текста: точка в именах ниже означает наследование от него.
+         Без этого стиля AAPT выдаёт "resource style/TextAppearance.AllClear not found". -->
+    <style name="TextAppearance.AllClear" parent="TextAppearance.AppCompat" />
+
     <!-- Крупная температура на сцене -->
-    <style name="TextAppearance.AllClear.BigTemp">
+    <style name="TextAppearance.AllClear.BigTemp" parent="TextAppearance.AllClear">
         <item name="android:textSize">72sp</item>
         <item name="android:textColor">@color/white</item>
         <item name="android:fontFamily">sans-serif-thin</item>
     </style>
 
-    <style name="TextAppearance.AllClear.City">
+    <style name="TextAppearance.AllClear.City" parent="TextAppearance.AllClear">
         <item name="android:textSize">22sp</item>
         <item name="android:textColor">@color/white</item>
         <item name="android:fontFamily">sans-serif-medium</item>
     </style>
 
-    <style name="TextAppearance.AllClear.Condition">
+    <style name="TextAppearance.AllClear.Condition" parent="TextAppearance.AllClear">
         <item name="android:textSize">16sp</item>
         <item name="android:textColor">@color/white</item>
     </style>
 
-    <style name="TextAppearance.AllClear.Caption">
+    <style name="TextAppearance.AllClear.Caption" parent="TextAppearance.AllClear">
         <item name="android:textSize">12sp</item>
         <item name="android:textColor">@color/text_secondary_dark_bg</item>
     </style>
 
-    <style name="TextAppearance.AllClear.CardHeader">
+    <style name="TextAppearance.AllClear.CardHeader" parent="TextAppearance.AllClear">
         <item name="android:textSize">13sp</item>
         <item name="android:textColor">@color/card_header_text</item>
         <item name="android:fontFamily">sans-serif-medium</item>
@@ -41,12 +45,12 @@
         <item name="android:letterSpacing">0.05</item>
     </style>
 
-    <style name="TextAppearance.AllClear.TileValue">
+    <style name="TextAppearance.AllClear.TileValue" parent="TextAppearance.AllClear">
         <item name="android:textSize">18sp</item>
         <item name="android:textColor">@color/white</item>
     </style>
 
-    <style name="TextAppearance.AllClear.TileLabel">
+    <style name="TextAppearance.AllClear.TileLabel" parent="TextAppearance.AllClear">
         <item name="android:textSize">12sp</item>
         <item name="android:textColor">@color/text_secondary_dark_bg</item>
     </style>
