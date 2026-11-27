@@ -140,7 +140,7 @@ class MoonPhaseView @JvmOverloads constructor(
     private val path = Path()
     private val oval = RectF()
 
-    private var illumination = 0.5   // 0..1
+    private var illumination = 0.5f   // 0..1
     private var waxing = true
 
     fun setPhase(illum: Double, waxing: Boolean) {
@@ -179,14 +179,12 @@ class MoonPhaseView @JvmOverloads constructor(
         // Терминатор — полуэллипс; ширина зависит от освещённости
         val termR = r * kotlin.math.abs(1f - 2f * k)
         oval.set(cx - termR, cy - r, cx + termR, cy + r)
-        val bulgeRight = if (waxing) k < 0.5f else k > 0.5f
-        // Дорисовываем/срезаем серп эллипсом
-        if ((waxing && k > 0.5f) || (!waxing && k > 0.5f)) {
-            // выпуклая: добавляем эллипс к светлой половине
+        if (k > 0.5f) {
+            // Выпуклая луна: добавляем эллипс к светлой половине
             if (waxing) path.addArc(oval, -90f, -180f) else path.addArc(oval, 90f, -180f)
             canvas.drawPath(path, litPaint)
         } else {
-            // серп: сначала вся светлая половина, потом тень эллипсом поверх
+            // Серп: светлая половина, потом тень эллипсом поверх
             canvas.drawPath(path, litPaint)
             path.reset()
             if (waxing) path.addArc(oval, -90f, -180f) else path.addArc(oval, 90f, -180f)
