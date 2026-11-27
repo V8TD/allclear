@@ -22,10 +22,13 @@ import kotlin.random.Random
  * Живая сцена погоды в стиле MIUI 8: небо, холмы, флюгер и ветровой мешок,
  * осадки частицами. Всё рисуется примитивами Canvas — без картинок и библиотек.
  *
+ * Сцена занимает только шапку экрана (~400dp) и скроллится вместе с контентом.
+ * Низ сцены плавно растворяется в тёмном фоне страницы (#1A222C).
+ *
  * Энергоэффективность:
  * - все объекты созданы заранее, в onDraw нет выделения памяти;
- * - перерисовка ~30 раз/с через postDelayed, а не каждый кадр экрана;
- * - setRunning(false) полностью останавливает анимацию (вызывается из UI).
+ * - перерисовка ~30 раз/с через postDelayed;
+ * - setRunning(false) полностью останавливает анимацию.
  */
 class WeatherSceneView @JvmOverloads constructor(
     context: Context,
@@ -37,8 +40,10 @@ class WeatherSceneView @JvmOverloads constructor(
         private const val RAIN_COUNT = 70
         private const val SNOW_COUNT = 50
         private const val STAR_COUNT = 40
-        // Коды Yahoo/Chronus, которые показываем как грозу (0-2 — торнадо/шторм/ураган)
+        // Коды Yahoo/Chronus, которые показываем как грозу
         private val THUNDER_CODES = intArrayOf(0, 1, 2, 3, 4, 35, 37, 38, 39, 45, 47)
+        // Цвет фона страницы — в него растворяется низ сцены
+        private val PAGE_BACKGROUND = Color.parseColor("#FF1A222C")
     }
 
     // --- Состояние погоды ---
@@ -49,19 +54,19 @@ class WeatherSceneView @JvmOverloads constructor(
 
     private var running = false
     private var lastFrameTime = 0L
-    private var animTime = 0f          // накопленное время анимации, секунды
+    private var animTime = 0f
     private var lightningTimer = 0f
     private var lightningFlash = 0f
 
-    // --- Палитра (обновляется при смене погоды) ---
+    // --- Палитра ---
     private var skyTop = Color.parseColor("#4A90D9")
     private var skyBottom = Color.parseColor("#A8D0F0")
     private var hillFar = Color.parseColor("#7FB2E5")
     private var hillNear = Color.parseColor("#5E97D1")
-    private var skyShader: LinearGradient? = null
 
     // --- Краски (создаются один раз) ---
     private val skyPaint = Paint()
+    private val fadePaint = Paint()
     private val hillFarPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val hillNearPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val polePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -102,13 +107,13 @@ class WeatherSceneView @JvmOverloads constructor(
     }
     private val flashPaint = Paint().apply { color = Color.WHITE }
 
-    // --- Геометрия холмов ---
+    // --- Геометрия ---
     private val hillFarPath = Path()
     private val hillNearPath = Path()
     private val sockPath = Path()
     private val arrowPath = Path()
 
-    // --- Частицы (фиксированные массивы, без аллокаций в кадре) ---
+    // --- Частицы ---
     private val rainX = FloatArray(RAIN_COUNT)
     private val rainY = FloatArray(RAIN_COUNT)
     private val rainSpeed = FloatArray(RAIN_COUNT)
@@ -126,7 +131,6 @@ class WeatherSceneView @JvmOverloads constructor(
     private val frameRunnable = Runnable { invalidate() }
 
     init {
-        // Звёзды фиксированы (одинаковые при каждом запуске — спокойная картинка)
         val rnd = Random(42)
         for (i in 0 until STAR_COUNT) {
             starX[i] = rnd.nextFloat()
@@ -136,7 +140,7 @@ class WeatherSceneView @JvmOverloads constructor(
         applyPalette()
     }
 
-    /** Установить погоду для сцены. Вызывается при привязке данных города. */
+    /** Установить погоду для сцены. */
     fun setWeather(code: Int, day: Boolean, windSpeedMs: Double, windDirectionDeg: Int) {
         val changed = code != conditionCode || day != isDay
         conditionCode = code
@@ -145,12 +149,12 @@ class WeatherSceneView @JvmOverloads constructor(
         windDirDeg = windDirectionDeg
         if (changed) {
             applyPalette()
-            rebuildSkyShader()
+            rebuildShaders()
         }
         invalidate()
     }
 
-    /** Включить/выключить анимацию (жизненный цикл страницы). */
+    /** Включить/выключить анимацию. */
     fun setRunning(value: Boolean) {
         if (running == value) return
         running = value
@@ -178,39 +182,43 @@ class WeatherSceneView @JvmOverloads constructor(
         super.onSizeChanged(w, h, oldw, oldh)
         if (w <= 0 || h <= 0) return
         buildHills(w, h)
-        rebuildSkyShader()
+        rebuildShaders()
         initParticles(w, h)
     }
 
-    private fun rebuildSkyShader() {
+    private fun rebuildShaders() {
         if (width <= 0 || height <= 0) return
-        skyShader = LinearGradient(
+        skyPaint.shader = LinearGradient(
             0f, 0f, 0f, height.toFloat(),
             skyTop, skyBottom, Shader.TileMode.CLAMP
         )
-        skyPaint.shader = skyShader
+        // Растворение низа сцены в фоне страницы
+        fadePaint.shader = LinearGradient(
+            0f, height * 0.78f, 0f, height.toFloat(),
+            Color.TRANSPARENT, PAGE_BACKGROUND, Shader.TileMode.CLAMP
+        )
     }
 
     private fun buildHills(w: Int, h: Int) {
-        // Дальний холм: гребень на ~55% высоты сцены
+        // Дальний холм: гребень ~66% высоты шапки
         hillFarPath.reset()
-        hillFarPath.moveTo(0f, h * 0.62f)
+        hillFarPath.moveTo(0f, h * 0.66f)
         val steps = 24
         for (i in 0..steps) {
             val x = w.toFloat() * i / steps
-            val y = h * 0.62f - sin(i.toFloat() / steps * PI * 1.3 + 0.4).toFloat() * h * 0.07f
+            val y = h * 0.66f - sin(i.toFloat() / steps * PI * 1.3 + 0.4).toFloat() * h * 0.06f
             hillFarPath.lineTo(x, y)
         }
         hillFarPath.lineTo(w.toFloat(), h.toFloat())
         hillFarPath.lineTo(0f, h.toFloat())
         hillFarPath.close()
 
-        // Ближний холм: гребень на ~75%
+        // Ближний холм: гребень ~82%
         hillNearPath.reset()
-        hillNearPath.moveTo(0f, h * 0.80f)
+        hillNearPath.moveTo(0f, h * 0.82f)
         for (i in 0..steps) {
             val x = w.toFloat() * i / steps
-            val y = h * 0.80f - sin(i.toFloat() / steps * PI * 1.1 + 2.2).toFloat() * h * 0.06f
+            val y = h * 0.82f - sin(i.toFloat() / steps * PI * 1.1 + 2.2).toFloat() * h * 0.05f
             hillNearPath.lineTo(x, y)
         }
         hillNearPath.lineTo(w.toFloat(), h.toFloat())
@@ -223,7 +231,7 @@ class WeatherSceneView @JvmOverloads constructor(
         for (i in 0 until RAIN_COUNT) {
             rainX[i] = rnd.nextFloat() * w
             rainY[i] = rnd.nextFloat() * h
-            rainSpeed[i] = h * (0.9f + rnd.nextFloat() * 0.6f)   // px/сек
+            rainSpeed[i] = h * (0.9f + rnd.nextFloat() * 0.6f)
             rainLen[i] = h * 0.02f + rnd.nextFloat() * h * 0.015f
         }
         for (i in 0 until SNOW_COUNT) {
@@ -236,7 +244,7 @@ class WeatherSceneView @JvmOverloads constructor(
         particlesReady = true
     }
 
-    // --- Группы погоды по кодам Yahoo/Chronus ---
+    // --- Группы погоды ---
 
     private fun isThunder(): Boolean = conditionCode in THUNDER_CODES
     private fun isRain(): Boolean = conditionCode in 5..12 || conditionCode == 17 || conditionCode == 18 || conditionCode == 40
@@ -284,7 +292,6 @@ class WeatherSceneView @JvmOverloads constructor(
         val h = height.toFloat()
         if (w <= 0 || h <= 0) return
 
-        // Шаг времени (ограничен — после паузы частицы не прыгают)
         val now = SystemClock.uptimeMillis()
         val dt = min((now - lastFrameTime) / 1000f, 0.05f)
         lastFrameTime = now
@@ -293,7 +300,7 @@ class WeatherSceneView @JvmOverloads constructor(
         // Небо
         canvas.drawRect(0f, 0f, w, h, skyPaint)
 
-        // Звёзды (ночь, ясно/малооблачно)
+        // Звёзды
         if (!isDay && (isClear() || conditionCode == 29 || conditionCode == 30)) {
             for (i in 0 until STAR_COUNT) {
                 canvas.drawCircle(starX[i] * w, starY[i] * h, starSize[i], starPaint)
@@ -303,13 +310,13 @@ class WeatherSceneView @JvmOverloads constructor(
         // Солнце или луна
         if (isClear() || conditionCode == 29 || conditionCode == 30 || conditionCode == 27 || conditionCode == 28) {
             if (isDay) {
-                canvas.drawCircle(w * 0.78f, h * 0.16f, h * 0.055f, sunPaint)
+                canvas.drawCircle(w * 0.80f, h * 0.14f, h * 0.05f, sunPaint)
             } else {
-                canvas.drawCircle(w * 0.78f, h * 0.16f, h * 0.045f, moonPaint)
+                canvas.drawCircle(w * 0.80f, h * 0.14f, h * 0.04f, moonPaint)
             }
         }
 
-        // Холмы
+        // Холмы, носок на дальнем, флюгер на ближнем (оба справа от текста)
         canvas.drawPath(hillFarPath, hillFarPaint)
         drawWindsock(canvas, w, h)
         canvas.drawPath(hillNearPath, hillNearPaint)
@@ -329,7 +336,7 @@ class WeatherSceneView @JvmOverloads constructor(
             if (isSnow()) drawSnow(canvas, w, h, dt)
         }
 
-        // Гроза: вспышка каждые ~7 секунд на 2 кадра
+        // Гроза
         if (isThunder() && running) {
             lightningTimer += dt
             if (lightningTimer > 7f) {
@@ -343,6 +350,9 @@ class WeatherSceneView @JvmOverloads constructor(
             }
         }
 
+        // Растворение низа в фоне страницы
+        canvas.drawRect(0f, h * 0.78f, w, h, fadePaint)
+
         // Следующий кадр
         if (running && isAttachedToWindow) {
             removeCallbacks(frameRunnable)
@@ -351,7 +361,6 @@ class WeatherSceneView @JvmOverloads constructor(
     }
 
     private fun drawRain(canvas: Canvas, w: Float, h: Float, dt: Float) {
-        // Наклон штрихов зависит от ветра
         val slant = (windMs.toFloat().coerceIn(0f, 15f) / 15f) * 14f *
             (if (windDirDeg in 90..270) -1f else 1f)
         for (i in 0 until RAIN_COUNT) {
@@ -388,31 +397,28 @@ class WeatherSceneView @JvmOverloads constructor(
     }
 
     /**
-     * Ветровой мешок на дальнем холме (слева).
-     * Отклонение от вертикали: штиль — висит, 15 м/с — горизонтален.
-     * Направление: ветер с востока (90..270°) — мешок влево, иначе вправо.
+     * Ветровой мешок на дальнем холме, справа от текста.
+     * Штиль — висит, 15 м/с — почти горизонтален. Ветер с востока — мешок влево.
      */
     private fun drawWindsock(canvas: Canvas, w: Float, h: Float) {
-        val baseX = w * 0.18f
-        val baseY = h * 0.60f
-        val poleH = h * 0.16f
+        val baseX = w * 0.60f
+        val baseY = h * 0.64f
+        val poleH = h * 0.15f
         val topY = baseY - poleH
 
         canvas.drawLine(baseX, baseY, baseX, topY, polePaint)
 
         val strength = (windMs.toFloat().coerceIn(0f, 15f) / 15f)
-        // Угол мешка от горизонтали: 90° (висит) → 5° (почти горизонт)
         val sway = sin(animTime * 2.2f) * (3f + strength * 4f)
         val angleDeg = 90f - strength * 85f + sway * (1f - strength * 0.6f)
         val toLeft = windDirDeg in 90..270
         val dirSign = if (toLeft) -1f else 1f
         val angleRad = Math.toRadians(angleDeg.toDouble())
 
-        val sockLen = h * 0.11f
+        val sockLen = h * 0.10f
         val segCount = 5
-        val startRadius = h * 0.018f
+        val startRadius = h * 0.016f
 
-        // Ось мешка: от крепления вниз-вбок
         val dx = (cos(angleRad).toFloat()) * dirSign
         val dy = sin(angleRad).toFloat()
 
@@ -425,7 +431,6 @@ class WeatherSceneView @JvmOverloads constructor(
             val y0 = topY + dy * sockLen * t0
             val x1 = baseX + dx * sockLen * t1
             val y1 = topY + dy * sockLen * t1
-            // Перпендикуляр к оси
             val px = -dy
             val py = dx
             sockPath.reset()
@@ -439,37 +444,31 @@ class WeatherSceneView @JvmOverloads constructor(
     }
 
     /**
-     * Флюгер на ближнем холме (справа): мачта + стрелка.
-     * Стрелка указывает, ОТКУДА дует ветер (метеорологическое направление).
+     * Флюгер на ближнем холме, у правого края.
+     * Стрелка указывает, ОТКУДА дует ветер.
      */
     private fun drawVane(canvas: Canvas, w: Float, h: Float) {
-        val baseX = w * 0.82f
-        val baseY = h * 0.78f
-        val poleH = h * 0.13f
+        val baseX = w * 0.85f
+        val baseY = h * 0.80f
+        val poleH = h * 0.12f
         val topY = baseY - poleH
 
         canvas.drawLine(baseX, baseY, baseX, topY, polePaint)
 
-        // Стрелка в плоскости экрана: восток (90°) — вправо, запад (270°) — влево.
-        // Проекция: горизонтальная составляющая = sin(направление).
         val horizontal = sin(Math.toRadians(windDirDeg.toDouble())).toFloat()
-        val len = h * 0.05f
+        val len = h * 0.045f
         val tailLen = len * 0.6f
 
         canvas.save()
         canvas.translate(baseX, topY)
-        // Лёгкое дрожание при сильном ветре
         val jitter = if (windMs > 8) sin(animTime * 9f) * 2f else 0f
         canvas.rotate(jitter)
 
         arrowPath.reset()
-        // Остриё (смотрит ОТКУДА ветер: восток → остриё вправо)
         arrowPath.moveTo(horizontal * len, -len * 0.18f)
         arrowPath.lineTo(horizontal * len * 0.55f, -len * 0.30f)
         arrowPath.lineTo(horizontal * len * 0.55f, -len * 0.06f)
-        // Ось
         arrowPath.lineTo(-horizontal * tailLen, -len * 0.06f)
-        // Хвост-оперение
         arrowPath.lineTo(-horizontal * tailLen, -len * 0.34f)
         arrowPath.lineTo(-horizontal * tailLen * 1.35f, -len * 0.12f)
         arrowPath.lineTo(-horizontal * tailLen, len * 0.10f)
