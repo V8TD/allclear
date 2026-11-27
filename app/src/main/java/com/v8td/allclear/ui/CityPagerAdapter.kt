@@ -17,10 +17,12 @@ import java.util.Calendar
 /**
  * Страницы городов для ViewPager2.
  * Каждая страница: живая сцена + шапка + широкие карточки прогнозов и деталей.
+ *
+ * Исправлено: убран слушатель скролла для swipe-refresh —
+ * NestedScrollView协调ирует жесты со SwipeRefreshLayout сам.
  */
 class CityPagerAdapter(
-    private val context: Context,
-    private val onScrollStateChanged: (atTop: Boolean) -> Unit
+    private val context: Context
 ) : RecyclerView.Adapter<CityPagerAdapter.PageHolder>() {
 
     private val cities = mutableListOf<City>()
@@ -71,10 +73,6 @@ class CityPagerAdapter(
         binding.detailsGrid.layoutManager = GridLayoutManager(context, 2)
         binding.detailsGrid.adapter = holder.tilesAdapter
 
-        // Сообщаем активности, когда страница в самом верху (для swipe-refresh)
-        binding.scrollContent.viewTreeObserver.addOnScrollChangedListener {
-            onScrollStateChanged(binding.scrollContent.scrollY == 0)
-        }
         return holder
     }
 
