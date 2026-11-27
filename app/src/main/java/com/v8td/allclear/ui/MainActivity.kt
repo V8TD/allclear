@@ -25,6 +25,9 @@ import kotlinx.coroutines.launch
 /**
  * Главный экран: страницы городов (свайп), потянуть-обновить, живая сцена.
  * Первый запуск: разрешение геолокации → координаты → город → погода.
+ *
+ * Исправлено: убран костыль включения/выключения swipe-refresh —
+ * со NestedScrollView он работает штатно и не дёргает контент.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -60,13 +63,7 @@ class MainActivity : AppCompatActivity() {
         locationHelper = LocationHelper(this)
         settings = AppSettings(this)
 
-        adapter = CityPagerAdapter(
-            context = this,
-            onScrollStateChanged = { atTop ->
-                // Потянуть-обновить работает только когда страница в самом верху
-                binding.swipeRefresh.isEnabled = atTop
-            }
-        )
+        adapter = CityPagerAdapter(this)
         binding.cityPager.adapter = adapter
         binding.cityPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
