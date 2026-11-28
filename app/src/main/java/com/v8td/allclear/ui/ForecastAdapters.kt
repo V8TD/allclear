@@ -7,22 +7,18 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.util.AttributeSet
-import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
-import androidx.recyclerview.widget.RecyclerView
 import com.v8td.allclear.R
-import com.v8td.allclear.data.DailyForecast
-import com.v8td.allclear.data.HourlyForecast
-import com.v8td.allclear.databinding.ItemDailyForecastBinding
-import com.v8td.allclear.databinding.ItemHourlyForecastBinding
 import com.v8td.allclear.util.WeatherFormat
 
 /**
  * Временный маппинг кодов Yahoo/Chronus на встроенные иконки-заглушки.
  * Полные наборы (0–47, Chronus-паки) — Этап 6.
+ * Старые HourlyAdapter/DailyAdapter удалены: прогнозы рисуют ленты
+ * HourlyStripView/DailyStripView (стиль WM8).
  */
 object WeatherIcons {
+
     fun iconFor(code: Int, isDay: Boolean): Int = when (code) {
         31 -> R.drawable.ic_weather_moon
         32, 36 -> R.drawable.ic_weather_sun
@@ -36,76 +32,9 @@ object WeatherIcons {
         in 19..22, 23, 24 -> R.drawable.ic_weather_fog
         else -> R.drawable.ic_weather_na
     }
-}
 
-/** Почасовой прогноз: горизонтальная лента. */
-class HourlyAdapter(private val context: Context) :
-    RecyclerView.Adapter<HourlyAdapter.Holder>() {
-
-    private val items = mutableListOf<HourlyForecast>()
-
-    fun submit(list: List<HourlyForecast>) {
-        items.clear()
-        items.addAll(list)
-        notifyDataSetChanged()
-    }
-
-    override fun getItemCount(): Int = items.size
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
-        return Holder(
-            ItemHourlyForecastBinding.inflate(LayoutInflater.from(context), parent, false)
-        )
-    }
-
-    override fun onBindViewHolder(holder: Holder, position: Int) {
-        val item = items[position]
-        val b = holder.binding
-        b.hourTime.text = if (position == 0) context.getString(R.string.now)
-            else WeatherFormat.time(item.time)
-        b.hourTemp.text = WeatherFormat.temp(context, item.temp)
-        b.hourPrecip.text = if (item.precipProb >= 0) "${item.precipProb}%" else ""
-        b.hourIcon.setImageResource(WeatherIcons.iconFor(item.conditionCode, item.isDay))
-    }
-
-    class Holder(val binding: ItemHourlyForecastBinding) :
-        RecyclerView.ViewHolder(binding.root)
-}
-
-/** Ежедневный прогноз: строки. */
-class DailyAdapter(private val context: Context) :
-    RecyclerView.Adapter<DailyAdapter.Holder>() {
-
-    private val items = mutableListOf<DailyForecast>()
-
-    fun submit(list: List<DailyForecast>) {
-        items.clear()
-        items.addAll(list)
-        notifyDataSetChanged()
-    }
-
-    override fun getItemCount(): Int = items.size
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
-        return Holder(
-            ItemDailyForecastBinding.inflate(LayoutInflater.from(context), parent, false)
-        )
-    }
-
-    override fun onBindViewHolder(holder: Holder, position: Int) {
-        val item = items[position]
-        val b = holder.binding
-        b.dayName.text = WeatherFormat.dayLabel(context, item.date)
-        b.dayDate.text = WeatherFormat.shortDate(item.date)
-        b.dayIcon.setImageResource(WeatherIcons.iconFor(item.conditionCode, true))
-        b.dayDesc.text = conditionName(context, item.conditionCode)
-        b.dayPrecip.text = if (item.precipProb >= 0) "${item.precipProb}%" else ""
-        b.dayTempMax.text = WeatherFormat.temp(context, item.tempMax)
-        b.dayTempMin.text = WeatherFormat.temp(context, item.tempMin)
-    }
-
-    /** Краткое название группы погоды для строки прогноза. */
-    private fun conditionName(context: Context, code: Int): String = when (code) {
+    /** Краткое название группы погоды для колонки прогноза. */
+    fun conditionName(context: Context, code: Int): String = when (code) {
         31, 32, 36 -> context.getString(R.string.cond_clear)
         33, 34 -> context.getString(R.string.cond_fair)
         27, 28, 29, 30, 44 -> context.getString(R.string.cond_partly)
@@ -117,9 +46,6 @@ class DailyAdapter(private val context: Context) :
         in 19..22 -> context.getString(R.string.cond_fog)
         else -> WeatherFormat.DASH
     }
-
-    class Holder(val binding: ItemDailyForecastBinding) :
-        RecyclerView.ViewHolder(binding.root)
 }
 
 /**
@@ -139,7 +65,6 @@ class MoonPhaseView @JvmOverloads constructor(
     }
     private val path = Path()
     private val oval = RectF()
-
     private var illumination = 0.5f   // 0..1
     private var waxing = true
 
@@ -160,7 +85,6 @@ class MoonPhaseView @JvmOverloads constructor(
 
         // Тёмный диск целиком
         canvas.drawCircle(cx, cy, r, darkPaint)
-
         val k = illumination
         if (k <= 0.02f) return          // новолуние — всё тёмное
         if (k >= 0.98f) {               // полнолуние — всё светлое
@@ -176,6 +100,7 @@ class MoonPhaseView @JvmOverloads constructor(
         } else {
             path.addArc(oval, 90f, 180f)    // левая половина
         }
+
         // Терминатор — полуэллипс; ширина зависит от освещённости
         val termR = r * kotlin.math.abs(1f - 2f * k)
         oval.set(cx - termR, cy - r, cx + termR, cy + r)
