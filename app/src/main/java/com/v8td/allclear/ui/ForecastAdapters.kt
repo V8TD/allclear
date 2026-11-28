@@ -33,11 +33,11 @@ object WeatherIcons {
         else -> R.drawable.ic_weather_na
     }
 
-    /** Краткое название группы погоды для колонки прогноза. */
+    /** Краткое название группы погоды для колонки прогноза (коротко, как WM8). */
     fun conditionName(context: Context, code: Int): String = when (code) {
         31, 32, 36 -> context.getString(R.string.cond_clear)
         33, 34 -> context.getString(R.string.cond_fair)
-        27, 28, 29, 30, 44 -> context.getString(R.string.cond_partly)
+        27, 28, 29, 30, 44 -> context.getString(R.string.cond_cloudy)
         26 -> context.getString(R.string.cond_overcast)
         0, 1, 2, 3, 4, 35, 37, 38, 39, 45, 47 -> context.getString(R.string.cond_thunder)
         in 5..8, 17, 18 -> context.getString(R.string.cond_sleet)
