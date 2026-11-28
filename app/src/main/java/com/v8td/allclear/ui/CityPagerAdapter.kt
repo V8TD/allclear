@@ -5,7 +5,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.v8td.allclear.R
 import com.v8td.allclear.data.City
@@ -18,6 +17,7 @@ import java.util.Calendar
  * Страницы городов для ViewPager2.
  * Стабильные ID — страницы не пересоздаются при обновлении данных,
  * позиция прокрутки не сбрасывается.
+ * Прогнозы — горизонтальные ленты в стиле WM8 (HourlyStripView/DailyStripView).
  */
 class CityPagerAdapter(
     private val context: Context
@@ -47,7 +47,7 @@ class CityPagerAdapter(
         if (index >= 0) notifyItemChanged(index)
     }
 
-    /** Может ли текущая страница прокручиваться вверх (для SwipeRefresh). */
+    /** Может ли текущая страница прокручиваться вверх (для потягивателя). */
     fun canCurrentPageScrollUp(): Boolean {
         val holder = holders[activePosition] ?: return false
         return holder.binding.scrollContent.canScrollVertically(-1)
@@ -70,17 +70,8 @@ class CityPagerAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PageHolder {
         val binding = PageCityBinding.inflate(LayoutInflater.from(context), parent, false)
         val holder = PageHolder(binding)
-
-        binding.hourlyList.layoutManager =
-            LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
-        binding.hourlyList.adapter = holder.hourlyAdapter
-
-        binding.dailyList.layoutManager = LinearLayoutManager(context)
-        binding.dailyList.adapter = holder.dailyAdapter
-
         binding.detailsGrid.layoutManager = GridLayoutManager(context, 2)
         binding.detailsGrid.adapter = holder.tilesAdapter
-
         return holder
     }
 
@@ -109,13 +100,10 @@ class CityPagerAdapter(
     inner class PageHolder(val binding: PageCityBinding) :
         RecyclerView.ViewHolder(binding.root) {
 
-        val hourlyAdapter = HourlyAdapter(context)
-        val dailyAdapter = DailyAdapter(context)
         val tilesAdapter = DetailTilesAdapter(context)
 
         fun bind(city: City, data: WeatherData?) {
             val b = binding
-
             b.textCity.text = city.name
             if (city.region != null) {
                 b.textRegion.visibility = View.VISIBLE
@@ -134,8 +122,9 @@ class CityPagerAdapter(
                 b.miniPressure.text = WeatherFormat.DASH
                 b.miniFeels.text = WeatherFormat.DASH
                 b.sceneView.setWeather(3200, true, 0.0, 0)
-                hourlyAdapter.submit(emptyList())
-                dailyAdapter.submit(emptyList())
+                b.hourlyStrip.setData(emptyList())
+                b.dailyStrip.setData(emptyList())
+                b.sunArcView.setSunTimes(0L, 0L)
                 tilesAdapter.submit(null)
                 bindAstronomy(null)
                 b.textAsOf.text = ""
@@ -143,7 +132,6 @@ class CityPagerAdapter(
             }
 
             val day = isDayNow(data)
-
             b.textBigTemp.text = WeatherFormat.temp(context, data.temperature)
             b.textCondition.text = data.description
             b.textFeelsLike.text = context.getString(R.string.feels_like) + " " +
@@ -152,19 +140,35 @@ class CityPagerAdapter(
                 context,
                 if (data.observationTime > 0) data.observationTime else System.currentTimeMillis()
             )
-
             b.miniWind.text = WeatherFormat.windCompact(context, data.windSpeed, data.windDirection)
             b.miniHumidity.text = WeatherFormat.percent(data.humidity)
             b.miniPressure.text = WeatherFormat.pressure(context, data.pressure)
             b.miniFeels.text = WeatherFormat.temp(context, data.feelsLike)
-
             b.sceneView.setWeather(data.conditionCode, day, data.windSpeed, data.windDirection)
 
-            hourlyAdapter.submit(data.hourlyForecast)
-            dailyAdapter.submit(data.dailyForecast)
+            b.hourlyStrip.setData(data.hourlyForecast.mapIndexed { i, h ->
+                HourlyColumn(
+                    time = if (i == 0) context.getString(R.string.now) else WeatherFormat.time(h.time),
+                    date = WeatherFormat.shortDate(h.time),
+                    prob = if (h.precipProb >= 0) h.precipProb else null,
+                    temp = h.temp,
+                    iconRes = WeatherIcons.iconFor(h.conditionCode, h.isDay)
+                )
+            })
+            b.dailyStrip.setData(data.dailyForecast.map { d ->
+                DailyColumn(
+                    day = WeatherFormat.dayLabel(context, d.date),
+                    date = WeatherFormat.shortDate(d.date),
+                    desc = WeatherIcons.conditionName(context, d.conditionCode),
+                    iconRes = WeatherIcons.iconFor(d.conditionCode, true),
+                    max = d.tempMax,
+                    min = d.tempMin,
+                    prob = if (d.precipProb >= 0) d.precipProb else null
+                )
+            })
+
             tilesAdapter.submit(data)
             bindAstronomy(data)
-
             val asOfTime = if (data.observationTime > 0) data.observationTime
                 else System.currentTimeMillis()
             b.textAsOf.text = context.getString(
@@ -181,6 +185,7 @@ class CityPagerAdapter(
                 b.textDayLength.text = ""
                 b.textMoonPhase.text = WeatherFormat.moonPhaseName(context)
                 b.moonView.setPhase(WeatherFormat.moonIllumination(), waxing = true)
+                b.sunArcView.setSunTimes(0L, 0L)
                 return
             }
             b.textSunrise.text = context.getString(R.string.sunrise) + " " +
@@ -192,6 +197,7 @@ class CityPagerAdapter(
             b.textMoonPhase.text = WeatherFormat.moonPhaseName(context)
             val phaseIndex = WeatherFormat.moonPhaseIndex()
             b.moonView.setPhase(WeatherFormat.moonIllumination(), waxing = phaseIndex in 1..3)
+            b.sunArcView.setSunTimes(data.sunrise, data.sunset)
         }
 
         /** День сейчас: по восходу/закату, иначе по почасовому флагу, иначе по часам. */
