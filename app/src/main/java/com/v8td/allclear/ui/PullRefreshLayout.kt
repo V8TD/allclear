@@ -1,30 +1,36 @@
 package com.v8td.allclear.ui
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.RectF
+import android.graphics.Path
+import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.ViewConfiguration
 import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
+import com.v8td.allclear.R
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sin
 
 /**
- * Собственный потягиватель обновления вместо SwipeRefreshLayout.
+ * Потягиватель обновления в стиле WM8.
  *
- * Содержимое НЕ сдвигается вообще: индикатор проявляется поверх сцены
- * (прогресс-дуга пока тянет палец, вращение пока идёт загрузка).
- * Размеры и границы прокрутки не меняются никогда — залипание и рывки
- * невозможны конструктивно.
+ * Пока палец тянет вниз (страница в самом верху) содержимое упруго едет за
+ * пальцем; в открывающейся сверху полосе рисуются шевроны-уголки и надпись.
+ * Отпустил ниже порога — плавно вернулось; выше — обновление.
+ * Во время обновления полоса держится, шевроны бегут вниз; по завершении
+ * кратко «Обновлено только что» и плавное закрытие.
  *
+ * Движение — ТОЛЬКО translationY ребёнка: размеры и границы прокрутки не
+ * меняются никогда, поэтому залипание и рывки невозможны конструктивно.
  * Внутри должен лежать ровно один ребёнок — ViewPager2.
- * Потягивание перехватывается только при явном вертикальном жесте
- * (dy > 2*slop и dy > 1.5*|dx|), чтобы не мешать горизонтальным лентам.
  */
 class PullRefreshLayout @JvmOverloads constructor(
     context: Context,
@@ -32,7 +38,7 @@ class PullRefreshLayout @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : FrameLayout(context, attrs, defStyleAttr) {
 
-    /** Вызывается, когда пользователь дотянул до порога и отпустил. */
+    /** Вызывается, когда пользователь дотянул до порога и отпустил (или кнопка). */
     var onRefresh: () -> Unit = {}
 
     /** true = текущая страница может прокручиваться вверх (потягивание запрещено). */
@@ -41,58 +47,61 @@ class PullRefreshLayout @JvmOverloads constructor(
     private val density = resources.displayMetrics.density
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
-    private val triggerPull = 64f * density   // порог срабатывания при отпускании
-    private val maxPull = 150f * density      // предел «натяжения» пальцем
-    private val spinnerY = 96f * density      // центр индикатора поверх сцены
-    private val radius = 17f * density
-    private val strokeW = 3f * density
+    private val barH = 56f * density      // высота полосы обновления
+    private val maxShift = 100f * density // предел оттягивания пальцем
+
+    private val stateIdle = 0
+    private val statePull = 1
+    private val stateRefresh = 2
+    private val stateDone = 3
+    private var state = stateIdle
 
     private var downX = 0f
     private var downY = 0f
     private var pulling = false
-    private var refreshing = false
-    private var pull = 0f
+    private var shift = 0f
+    private var doneUntil = 0L
     private var animator: ValueAnimator? = null
 
-    private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val arcPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val arcRect = RectF()
+    private val chevPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val chevPath = Path()
 
     init {
-        trackPaint.style = Paint.Style.STROKE
-        trackPaint.strokeWidth = strokeW
-        trackPaint.color = 0xFF4FC3F7.toInt()
-        arcPaint.style = Paint.Style.STROKE
-        arcPaint.strokeWidth = strokeW
-        arcPaint.strokeCap = Paint.Cap.ROUND
-        arcPaint.color = 0xFF4FC3F7.toInt()
+        chevPaint.style = Paint.Style.STROKE
+        chevPaint.strokeWidth = 2f * density
+        chevPaint.strokeCap = Paint.Cap.ROUND
+        chevPaint.strokeJoin = Paint.Join.ROUND
+        chevPaint.color = 0xFF4FC3F7.toInt()
+        labelPaint.textSize = 11f * density
+        labelPaint.textAlign = Paint.Align.CENTER
+        labelPaint.color = 0xFFB0BEC5.toInt()
     }
 
-    /** Запуск обновления из кода (кнопка или потягивание). Идемпотентен. */
+    /** Запуск обновления из кода (кнопка). Идемпотентен. */
     fun beginRefresh() {
-        if (refreshing) return
-        refreshing = true
-        animator?.cancel()
-        pull = triggerPull
+        if (state == stateRefresh) return
+        state = stateRefresh
+        animateShift(barH, stateRefresh)
         onRefresh()
-        invalidate()
     }
 
     /** Вызывать по завершении загрузки (успех или ошибка). */
     fun finishRefresh() {
-        refreshing = false
-        animateTo(0f)
+        if (state != stateRefresh) return
+        state = stateDone
+        doneUntil = SystemClock.uptimeMillis() + 1200L
         invalidate()
     }
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
-        if (refreshing) return false
+        if (state == stateRefresh || state == stateDone) return false
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 downX = ev.x
                 downY = ev.y
                 pulling = false
-                if (pull > 0f) animator?.cancel()
+                if (shift > 0f) animator?.cancel()
             }
             MotionEvent.ACTION_MOVE -> {
                 val dy = ev.y - downY
@@ -112,12 +121,13 @@ class PullRefreshLayout @JvmOverloads constructor(
         when (ev.actionMasked) {
             MotionEvent.ACTION_MOVE -> {
                 val dy = ev.y - downY
-                setPull(min(maxPull, max(0f, dy * 0.5f)))
+                state = statePull
+                setShift(min(maxShift, max(0f, dy * 0.5f)))
                 return true
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 pulling = false
-                if (pull >= triggerPull) beginRefresh() else animateTo(0f)
+                if (shift >= barH) beginRefresh() else animateShift(0f, stateIdle)
                 return true
             }
         }
@@ -126,38 +136,90 @@ class PullRefreshLayout @JvmOverloads constructor(
 
     override fun dispatchDraw(canvas: Canvas) {
         super.dispatchDraw(canvas)
-        drawIndicator(canvas)
-    }
-
-    private fun drawIndicator(canvas: Canvas) {
-        val progress = if (refreshing) 1f else min(1f, pull / triggerPull)
-        if (progress <= 0.02f) return
-        val cx = width / 2f
-        val cy = spinnerY
-        trackPaint.alpha = (70 * progress).toInt()
-        canvas.drawCircle(cx, cy, radius, trackPaint)
-        arcPaint.alpha = (255 * progress).toInt()
-        arcRect.set(cx - radius, cy - radius, cx + radius, cy + radius)
-        if (refreshing) {
-            val t = (System.currentTimeMillis() % 900L) / 900f
-            canvas.drawArc(arcRect, t * 360f, 280f, false, arcPaint)
-            postInvalidateOnAnimation()
-        } else {
-            canvas.drawArc(arcRect, -90f, 270f * progress, false, arcPaint)
+        drawBar(canvas)
+        if (state == stateRefresh || state == stateDone) postInvalidateOnAnimation()
+        if (state == stateDone && SystemClock.uptimeMillis() > doneUntil) {
+            animateShift(0f, stateIdle)
         }
     }
 
-    private fun setPull(v: Float) {
-        pull = v
+    private fun drawBar(canvas: Canvas) {
+        if (shift <= 2f * density && state == stateIdle) return
+        val progress = min(1f, shift / barH)
+        val base = (255 * progress).toInt()
+        val cx = width / 2f
+        val t = SystemClock.uptimeMillis() / 1000f
+
+        when (state) {
+            stateDone -> {
+                val left = ((doneUntil - SystemClock.uptimeMillis()) / 1200f).coerceIn(0f, 1f)
+                val alpha = (255 * left).toInt()
+                chevPaint.alpha = alpha
+                chevron(canvas, cx, shift * 0.32f, up = true)
+                labelPaint.alpha = alpha
+                canvas.drawText(
+                    context.getString(R.string.updated_just_now), cx, shift * 0.82f, labelPaint
+                )
+            }
+            stateRefresh -> {
+                for (k in 0..2) {
+                    val phase = (t * 1.1f + k * 0.33f) % 1f
+                    val y = shift * 0.20f + phase * 18f * density
+                    chevPaint.alpha = (base * sin(phase * Math.PI.toFloat())).toInt()
+                    chevron(canvas, cx, y, up = false)
+                }
+                labelPaint.alpha = base
+                canvas.drawText(
+                    context.getString(R.string.refresh_running), cx, shift * 0.86f, labelPaint
+                )
+            }
+            else -> {
+                for (k in 0..2) {
+                    chevPaint.alpha = base
+                    chevron(canvas, cx, shift * 0.24f + k * 7f * density, up = false)
+                }
+                if (shift > 24f * density) {
+                    labelPaint.alpha = base
+                    val text = if (shift >= barH) R.string.refresh_release else R.string.refresh_pull
+                    canvas.drawText(context.getString(text), cx, shift * 0.86f, labelPaint)
+                }
+            }
+        }
+    }
+
+    private fun chevron(canvas: Canvas, cx: Float, y: Float, up: Boolean) {
+        val w = 6f * density
+        val h = 5f * density
+        chevPath.reset()
+        if (up) {
+            chevPath.moveTo(cx - w, y + h)
+            chevPath.lineTo(cx, y)
+            chevPath.lineTo(cx + w, y + h)
+        } else {
+            chevPath.moveTo(cx - w, y)
+            chevPath.lineTo(cx, y + h)
+            chevPath.lineTo(cx + w, y)
+        }
+        canvas.drawPath(chevPath, chevPaint)
+    }
+
+    private fun setShift(v: Float) {
+        shift = v
+        getChildAt(0)?.translationY = v
         invalidate()
     }
 
-    private fun animateTo(target: Float) {
+    private fun animateShift(target: Float, endState: Int) {
         animator?.cancel()
-        val a = ValueAnimator.ofFloat(pull, target)
-        a.duration = 220L
+        val a = ValueAnimator.ofFloat(shift, target)
+        a.duration = 240L
         a.interpolator = DecelerateInterpolator()
-        a.addUpdateListener { setPull(it.animatedValue as Float) }
+        a.addUpdateListener { setShift(it.animatedValue as Float) }
+        a.addListener(object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: Animator) {
+                if (state != stateRefresh) state = endState
+            }
+        })
         a.start()
         animator = a
     }
