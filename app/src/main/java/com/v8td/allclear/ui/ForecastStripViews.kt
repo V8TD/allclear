@@ -8,18 +8,18 @@ import android.graphics.drawable.Drawable
 import android.util.AttributeSet
 import android.view.View
 import androidx.core.content.ContextCompat
-import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** Колонка почасового прогноза (одна точка кривой). */
+/**
+ * Колонка почасового прогноза (одна точка кривой).
+ * Ветер и мм появятся здесь после расширения моделей провайдеров.
+ */
 data class HourlyColumn(
     val time: String,        // "Сейчас" / "03:00"
-    val date: String?,       // "28 нояб." — только когда день меняется
+    val date: String?,       // "28 нояб."
     val prob: Int?,          // % осадков, null = нет данных
-    val mm: Double?,         // мм осадков
-    val wind: String,        // "С 2 м/с"
     val temp: Double,
     val iconRes: Int
 )
@@ -32,7 +32,6 @@ data class DailyColumn(
     val iconRes: Int,
     val max: Double,
     val min: Double,
-    val wind: String,        // "С 2 м/с"
     val prob: Int?
 )
 
@@ -51,7 +50,7 @@ open class StripView @JvmOverloads constructor(
     protected val padH = 12f * d
     protected var columns = 0
     protected open val colW = 72f * d
-    protected open val stripH = 176f * d
+    protected open val stripH = 150f * d
 
     protected val textSmall = Paint(Paint.ANTI_ALIAS_FLAG)
     protected val textValue = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -137,14 +136,14 @@ open class StripView @JvmOverloads constructor(
     }
 }
 
-/** ПОЧАСОВОЙ ПРОГНОЗ: % / мм / ветер / кривая температуры / иконка / время / дата. */
+/** ПОЧАСОВОЙ ПРОГНОЗ: % / кривая температуры / иконка / время / дата. */
 class HourlyStripView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
 ) : StripView(context, attrs) {
 
     override val colW = 72f * d
-    override val stripH = 176f * d
+    override val stripH = 150f * d
 
     private var cols: List<HourlyColumn> = emptyList()
     private var ys = FloatArray(0)
@@ -158,8 +157,8 @@ class HourlyStripView @JvmOverloads constructor(
         for (c in list) { mn = min(mn, c.temp); mx = max(mx, c.temp) }
         if (list.isEmpty()) { mn = 0.0; mx = 1.0 }
         if (mx - mn < 1.0) { mn -= 1.0; mx += 1.0 }
-        val top = 80f * d
-        val bottom = 112f * d
+        val top = 46f * d
+        val bottom = 78f * d
         ys = FloatArray(list.size) { i -> bandY(list[i].temp, mn, mx, top, bottom) }
         requestLayout()
         invalidate()
@@ -172,10 +171,6 @@ class HourlyStripView @JvmOverloads constructor(
             val x = cx(i)
             textSmall.color = if ((c.prob ?: 0) > 0) 0xFF4FC3F7.toInt() else 0xFF78909C.toInt()
             canvas.drawText(if (c.prob != null) "${c.prob}%" else "—", x, 18f * d, textSmall)
-            textSmall.color = 0xFFB0BEC5.toInt()
-            val mmText = if (c.mm != null) String.format(Locale.getDefault(), "%.1f мм", c.mm) else "0 мм"
-            canvas.drawText(mmText, x, 34f * d, textSmall)
-            canvas.drawText(c.wind, x, 50f * d, textSmall)
             textTemp.color = 0xFFECEFF1.toInt()
             canvas.drawText(tempLabel(c.temp), x, ys[i] - 8f * d, textTemp)
         }
@@ -183,25 +178,25 @@ class HourlyStripView @JvmOverloads constructor(
         for (i in cols.indices) {
             val c = cols[i]
             val x = cx(i)
-            drawIcon(canvas, i, 130f * d, 24f * d)
+            drawIcon(canvas, i, 98f * d, 24f * d)
             textValue.color = 0xFFECEFF1.toInt()
-            canvas.drawText(c.time, x, 154f * d, textValue)
+            canvas.drawText(c.time, x, 122f * d, textValue)
             if (c.date != null) {
                 textSmall.color = 0xFF78909C.toInt()
-                canvas.drawText(c.date, x, 168f * d, textSmall)
+                canvas.drawText(c.date, x, 136f * d, textSmall)
             }
         }
     }
 }
 
-/** ЕЖЕДНЕВНЫЙ ПРОГНОЗ: день / дата / иконка / описание / кривые макс и мин / ветер / %. */
+/** ЕЖЕДНЕВНЫЙ ПРОГНОЗ: день / дата / иконка / описание / кривые макс и мин / %. */
 class DailyStripView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
 ) : StripView(context, attrs) {
 
     override val colW = 92f * d
-    override val stripH = 232f * d
+    override val stripH = 210f * d
 
     private var cols: List<DailyColumn> = emptyList()
     private var ysMax = FloatArray(0)
@@ -248,10 +243,8 @@ class DailyStripView @JvmOverloads constructor(
         for (i in cols.indices) {
             val c = cols[i]
             val x = cx(i)
-            textSmall.color = 0xFFB0BEC5.toInt()
-            canvas.drawText(c.wind, x, 202f * d, textSmall)
             textSmall.color = if ((c.prob ?: 0) > 0) 0xFF4FC3F7.toInt() else 0xFF78909C.toInt()
-            canvas.drawText(if (c.prob != null) "${c.prob}%" else "—", x, 218f * d, textSmall)
+            canvas.drawText(if (c.prob != null) "${c.prob}%" else "—", x, 202f * d, textSmall)
         }
     }
 }
