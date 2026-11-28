@@ -8,16 +8,21 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.v8td.allclear.R
 import com.v8td.allclear.data.City
+import com.v8td.allclear.data.HourlyForecast
 import com.v8td.allclear.data.WeatherData
 import com.v8td.allclear.databinding.PageCityBinding
 import com.v8td.allclear.util.WeatherFormat
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import kotlin.math.abs
 
 /**
  * Страницы городов для ViewPager2.
- * Стабильные ID — страницы не пересоздаются при обновлении данных,
- * позиция прокрутки не сбрасывается.
- * Прогнозы — горизонтальные ленты в стиле WM8 (HourlyStripView/DailyStripView).
+ * Стабильные ID — страницы не пересоздаются при обновлении данных.
+ * Прогнозы — горизонтальные ленты WM8; в почасовой ленте между часами
+ * вставляются колонки-маркеры восхода и заката (как в WM8).
  */
 class CityPagerAdapter(
     private val context: Context
@@ -97,6 +102,86 @@ class CityPagerAdapter(
         holder.binding.sceneView.setRunning(position == activePosition && resumed)
     }
 
+    /** Полное название дня («Понедельник»), сегодня/завтра — словами. */
+    private fun fullDayLabel(dayStartMs: Long): String {
+        val cal = Calendar.getInstance()
+        cal.set(Calendar.HOUR_OF_DAY, 0)
+        cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        val todayStart = cal.timeInMillis
+        val dayMs = 86_400_000L
+        return when {
+            abs(dayStartMs - todayStart) < dayMs / 2 -> context.getString(R.string.today)
+            abs(dayStartMs - todayStart - dayMs) < dayMs / 2 -> context.getString(R.string.tomorrow)
+            else -> SimpleDateFormat("EEEE", Locale.getDefault()).format(Date(dayStartMs))
+                .replaceFirstChar { it.uppercase() }
+        }
+    }
+
+    /** Часы + маркеры восхода/заката в хронологическом порядке. */
+    private fun buildHourlyColumns(data: WeatherData): List<HourlyColumn> {
+        val hours = data.hourlyForecast
+        if (hours.isEmpty()) return emptyList()
+        val start = hours.first().time
+        val end = hours.last().time
+
+        val points = ArrayList<Triple<Long, Int, HourlyForecast?>>()
+        for (h in hours) points.add(Triple(h.time, 0, h))
+        if (data.sunrise in start..end) points.add(Triple(data.sunrise, 1, null))
+        if (data.sunset in start..end && data.sunset > data.sunrise) {
+            points.add(Triple(data.sunset, 2, null))
+        }
+        points.sortBy { it.first }
+
+        val result = ArrayList<HourlyColumn>(points.size)
+        var lastCode = hours.first().conditionCode
+        for ((idx, p) in points.withIndex()) {
+            val (t, marker, h) = p
+            val temp = h?.temp ?: interpolatedTemp(points, idx)
+            val code = h?.conditionCode ?: lastCode
+            lastCode = code
+            result.add(
+                HourlyColumn(
+                    time = if (idx == 0 && marker == 0) context.getString(R.string.now)
+                        else WeatherFormat.time(t),
+                    date = WeatherFormat.shortDate(t),
+                    prob = h?.precipProb?.takeIf { it >= 0 },
+                    temp = temp,
+                    iconRes = if (h != null) WeatherIcons.iconFor(code, h.isDay) else 0,
+                    code = code,
+                    marker = marker
+                )
+            )
+        }
+        return result
+    }
+
+    /** Температура маркера — линейно между соседними часами. */
+    private fun interpolatedTemp(
+        points: List<Triple<Long, Int, HourlyForecast?>>,
+        idx: Int
+    ): Double {
+        val t = points[idx].first
+        var before: HourlyForecast? = null
+        var after: HourlyForecast? = null
+        for (i in idx - 1 downTo 0) {
+            val h = points[i].third
+            if (h != null) { before = h; break }
+        }
+        for (i in idx + 1 until points.size) {
+            val h = points[i].third
+            if (h != null) { after = h; break }
+        }
+        if (before == null && after == null) return 0.0
+        if (before == null) return after!!.temp
+        if (after == null) return before.temp
+        val span = (after.time - before.time).toDouble()
+        if (span <= 0.0) return before.temp
+        val k = (t - before.time) / span
+        return before.temp + (after.temp - before.temp) * k
+    }
+
     inner class PageHolder(val binding: PageCityBinding) :
         RecyclerView.ViewHolder(binding.root) {
 
@@ -146,18 +231,10 @@ class CityPagerAdapter(
             b.miniFeels.text = WeatherFormat.temp(context, data.feelsLike)
             b.sceneView.setWeather(data.conditionCode, day, data.windSpeed, data.windDirection)
 
-            b.hourlyStrip.setData(data.hourlyForecast.mapIndexed { i, h ->
-                HourlyColumn(
-                    time = if (i == 0) context.getString(R.string.now) else WeatherFormat.time(h.time),
-                    date = WeatherFormat.shortDate(h.time),
-                    prob = if (h.precipProb >= 0) h.precipProb else null,
-                    temp = h.temp,
-                    iconRes = WeatherIcons.iconFor(h.conditionCode, h.isDay)
-                )
-            })
+            b.hourlyStrip.setData(buildHourlyColumns(data))
             b.dailyStrip.setData(data.dailyForecast.map { d ->
                 DailyColumn(
-                    day = WeatherFormat.dayLabel(context, d.date),
+                    day = fullDayLabel(d.date),
                     date = WeatherFormat.shortDate(d.date),
                     desc = WeatherIcons.conditionName(context, d.conditionCode),
                     iconRes = WeatherIcons.iconFor(d.conditionCode, true),
