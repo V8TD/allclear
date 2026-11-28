@@ -2,33 +2,41 @@ package com.v8td.allclear.ui
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RectF
 import android.graphics.drawable.Drawable
 import android.util.AttributeSet
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import androidx.core.content.ContextCompat
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
  * Колонка почасового прогноза (одна точка кривой).
+ * marker: 0 = обычный час, 1 = восход, 2 = закат (колонка-маркер WM8).
  * Ветер и мм появятся здесь после расширения моделей провайдеров.
  */
 data class HourlyColumn(
-    val time: String,        // "Сейчас" / "03:00"
-    val date: String?,       // "28 нояб."
-    val prob: Int?,          // % осадков, null = нет данных
+    val time: String,
+    val date: String?,
+    val prob: Int?,
     val temp: Double,
-    val iconRes: Int
+    val iconRes: Int,
+    val code: Int,
+    val marker: Int = 0
 )
 
 /** Колонка-день ежедневного прогноза (две точки: макс и мин). */
 data class DailyColumn(
-    val day: String,         // "Сегодня" / "Завтра" / "Пн"
-    val date: String,        // "28 нояб."
-    val desc: String,        // "Пасмурно"
+    val day: String,
+    val date: String,
+    val desc: String,
     val iconRes: Int,
     val max: Double,
     val min: Double,
@@ -37,9 +45,13 @@ data class DailyColumn(
 
 /**
  * База горизонтальных лент прогноза в стиле WM8.
- * Ширина = число колонок; кладётся в HorizontalScrollView.
- * Кривая сплошная через всю ленту (Catmull-Rom через точки колонок).
- * Все аллокации — в setData, не в onDraw.
+ * Колонки начинаются от самого края карточки (без левого поля).
+ * Кривая сплошная через всю ленту; все аллокации — в setData.
+ *
+ * Защита жеста: при касании ленты горизонтальный свайп защищается от
+ * старших контейнеров (ViewPager2 листал бы города вместо ленты),
+ * но НЕ от собственного HorizontalScrollView. Явный вертикальный жест
+ * снимает защиту — страница и потягивание работают как обычно.
  */
 open class StripView @JvmOverloads constructor(
     context: Context,
@@ -47,9 +59,9 @@ open class StripView @JvmOverloads constructor(
 ) : View(context, attrs) {
 
     protected val d = resources.displayMetrics.density
-    protected val padH = 12f * d
+    protected val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     protected var columns = 0
-    protected open val colW = 72f * d
+    protected open val colW = 58f * d
     protected open val stripH = 150f * d
 
     protected val textSmall = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -58,8 +70,14 @@ open class StripView @JvmOverloads constructor(
     protected val curvePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     protected val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     protected val dotInner = Paint(Paint.ANTI_ALIAS_FLAG)
+    protected val dashPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    protected val markerPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     protected val icons = ArrayList<Drawable?>()
     protected val path = Path()
+    protected val markerRect = RectF()
+
+    private var tDownX = 0f
+    private var tDownY = 0f
 
     init {
         textSmall.textSize = 11f * d
@@ -78,17 +96,54 @@ open class StripView @JvmOverloads constructor(
         dotPaint.style = Paint.Style.FILL
         dotInner.style = Paint.Style.FILL
         dotInner.color = 0xFF263238.toInt()
+        dashPaint.style = Paint.Style.STROKE
+        dashPaint.strokeWidth = 1f * d
+        dashPaint.color = 0x55FFFFFF
+        dashPaint.pathEffect = DashPathEffect(floatArrayOf(3f * d, 3f * d), 0f)
+        markerPaint.style = Paint.Style.FILL
+        markerPaint.color = 0xFFFFC107.toInt()
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val w = (padH * 2 + columns * colW).toInt()
+        val w = (columns * colW).toInt()
         val h = stripH.toInt()
         setMeasuredDimension(resolveSize(w, widthMeasureSpec), resolveSize(h, heightMeasureSpec))
     }
 
-    protected fun cx(i: Int): Float = padH + colW * i + colW / 2f
+    override fun onTouchEvent(ev: MotionEvent): Boolean {
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                tDownX = ev.x
+                tDownY = ev.y
+                guardHorizontal(true)
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val dx = ev.x - tDownX
+                val dy = ev.y - tDownY
+                if (abs(dy) > abs(dx) * 1.2f && abs(dy) > touchSlop) guardHorizontal(false)
+            }
+        }
+        return true
+    }
+
+    /** Защита от старших контейнеров, минуя собственный HorizontalScrollView. */
+    private fun guardHorizontal(disallow: Boolean) {
+        val hsv = parent as? View ?: return
+        val above = hsv.parent as? View ?: return
+        above.requestDisallowInterceptTouchEvent(disallow)
+    }
+
+    protected fun cx(i: Int): Float = colW * i + colW / 2f
 
     protected fun tempLabel(v: Double): String = "${v.roundToInt()}°"
+
+    /** Обрезка длинного названия многоточием, как в WM8 («Понедельн…»). */
+    protected fun fit(text: String, maxW: Float, p: Paint): String {
+        if (p.measureText(text) <= maxW) return text
+        var t = text
+        while (t.isNotEmpty() && p.measureText("$t…") > maxW) t = t.dropLast(1)
+        return "$t…"
+    }
 
     protected fun loadIcons(resIds: List<Int>) {
         icons.clear()
@@ -134,15 +189,37 @@ open class StripView @JvmOverloads constructor(
         val span = if (mx - mn < 0.001) 1.0 else mx - mn
         return (bottom - ((value - mn) / span) * (bottom - top)).toFloat()
     }
+
+    /** Пунктирная вертикаль колонки (Сейчас / восход / закат). */
+    protected fun drawDash(canvas: Canvas, i: Int, fromY: Float, toY: Float) {
+        val x = cx(i)
+        canvas.drawLine(x, fromY, x, toY, dashPaint)
+    }
+
+    /** Маркер восхода/заката: половинка солнца с лучами и стрелкой вверх/вниз. */
+    protected fun drawSunMarker(canvas: Canvas, i: Int, y: Float, rise: Boolean) {
+        val x = cx(i)
+        val r = 5f * d
+        markerRect.set(x - r, y - r, x + r, y + r)
+        canvas.drawArc(markerRect, 180f, 180f, true, markerPaint)
+        canvas.drawLine(x - r - 3f * d, y, x - r - 1f * d, y, markerPaint)
+        canvas.drawLine(x + r + 1f * d, y, x + r + 3f * d, y, markerPaint)
+        canvas.drawLine(x, y - r - 3f * d, x, y - r - 1f * d, markerPaint)
+        val ay = y - r - 6f * d
+        val tip = if (rise) ay - 5f * d else ay + 5f * d
+        canvas.drawLine(x, ay, x, tip, markerPaint)
+        canvas.drawLine(x, tip, x - 2.5f * d, tip + (if (rise) 2.5f * d else -2.5f * d), markerPaint)
+        canvas.drawLine(x, tip, x + 2.5f * d, tip + (if (rise) 2.5f * d else -2.5f * d), markerPaint)
+    }
 }
 
-/** ПОЧАСОВОЙ ПРОГНОЗ: % / кривая температуры / иконка / время / дата. */
+/** ПОЧАСОВОЙ ПРОГНОЗ WM8: % / кривая / иконки только при смене погоды / время / дата. */
 class HourlyStripView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
 ) : StripView(context, attrs) {
 
-    override val colW = 72f * d
+    override val colW = 58f * d
     override val stripH = 150f * d
 
     private var cols: List<HourlyColumn> = emptyList()
@@ -157,9 +234,7 @@ class HourlyStripView @JvmOverloads constructor(
         for (c in list) { mn = min(mn, c.temp); mx = max(mx, c.temp) }
         if (list.isEmpty()) { mn = 0.0; mx = 1.0 }
         if (mx - mn < 1.0) { mn -= 1.0; mx += 1.0 }
-        val top = 46f * d
-        val bottom = 78f * d
-        ys = FloatArray(list.size) { i -> bandY(list[i].temp, mn, mx, top, bottom) }
+        ys = FloatArray(list.size) { i -> bandY(list[i].temp, mn, mx, 46f * d, 78f * d) }
         requestLayout()
         invalidate()
     }
@@ -169,16 +244,24 @@ class HourlyStripView @JvmOverloads constructor(
         for (i in cols.indices) {
             val c = cols[i]
             val x = cx(i)
-            textSmall.color = if ((c.prob ?: 0) > 0) 0xFF4FC3F7.toInt() else 0xFF78909C.toInt()
-            canvas.drawText(if (c.prob != null) "${c.prob}%" else "—", x, 18f * d, textSmall)
-            textTemp.color = 0xFFECEFF1.toInt()
-            canvas.drawText(tempLabel(c.temp), x, ys[i] - 8f * d, textTemp)
+            if (i == 0 || c.marker != 0) drawDash(canvas, i, 40f * d, 140f * d)
+            if (c.marker == 0) {
+                textSmall.color = if ((c.prob ?: 0) > 0) 0xFF4FC3F7.toInt() else 0xFF78909C.toInt()
+                canvas.drawText(if (c.prob != null) "${c.prob}%" else "—", x, 18f * d, textSmall)
+                textTemp.color = 0xFFECEFF1.toInt()
+                canvas.drawText(tempLabel(c.temp), x, ys[i] - 8f * d, textTemp)
+            } else {
+                drawSunMarker(canvas, i, ys[i] - 10f * d, rise = c.marker == 1)
+            }
         }
         drawCurve(canvas, ys, 0xFF4FC3F7.toInt())
         for (i in cols.indices) {
             val c = cols[i]
             val x = cx(i)
-            drawIcon(canvas, i, 98f * d, 24f * d)
+            // Иконка под кривой — только там, где погода меняется (как в WM8).
+            if (c.marker == 0 && (i == 0 || c.code != cols[i - 1].code)) {
+                drawIcon(canvas, i, 98f * d, 22f * d)
+            }
             textValue.color = 0xFFECEFF1.toInt()
             canvas.drawText(c.time, x, 122f * d, textValue)
             if (c.date != null) {
@@ -189,13 +272,13 @@ class HourlyStripView @JvmOverloads constructor(
     }
 }
 
-/** ЕЖЕДНЕВНЫЙ ПРОГНОЗ: день / дата / иконка / описание / кривые макс и мин / %. */
+/** ЕЖЕДНЕВНЫЙ ПРОГНОЗ WM8: день / дата / иконка / описание / кривые макс и мин / %. */
 class DailyStripView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
 ) : StripView(context, attrs) {
 
-    override val colW = 92f * d
+    override val colW = 72f * d
     override val stripH = 210f * d
 
     private var cols: List<DailyColumn> = emptyList()
@@ -227,12 +310,12 @@ class DailyStripView @JvmOverloads constructor(
             val c = cols[i]
             val x = cx(i)
             textValue.color = if (i < 2) 0xFF4FC3F7.toInt() else 0xFFECEFF1.toInt()
-            canvas.drawText(c.day, x, 18f * d, textValue)
+            canvas.drawText(fit(c.day, colW - 6f * d, textValue), x, 18f * d, textValue)
             textSmall.color = 0xFF78909C.toInt()
             canvas.drawText(c.date, x, 32f * d, textSmall)
             drawIcon(canvas, i, 52f * d, 26f * d)
             textSmall.color = 0xFFB0BEC5.toInt()
-            canvas.drawText(c.desc, x, 78f * d, textSmall)
+            canvas.drawText(fit(c.desc, colW - 6f * d, textSmall), x, 78f * d, textSmall)
             textTemp.color = 0xFFECEFF1.toInt()
             canvas.drawText(tempLabel(c.max), x, ysMax[i] - 6f * d, textTemp)
             textTemp.color = 0xFFB0BEC5.toInt()
