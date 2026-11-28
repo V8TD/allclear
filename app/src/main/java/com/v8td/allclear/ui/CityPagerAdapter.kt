@@ -12,10 +12,7 @@ import com.v8td.allclear.data.HourlyForecast
 import com.v8td.allclear.data.WeatherData
 import com.v8td.allclear.databinding.PageCityBinding
 import com.v8td.allclear.util.WeatherFormat
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
-import java.util.Locale
 import kotlin.math.abs
 
 /**
@@ -23,6 +20,7 @@ import kotlin.math.abs
  * Стабильные ID — страницы не пересоздаются при обновлении данных.
  * Прогнозы — горизонтальные ленты WM8; в почасовой ленте между часами
  * вставляются колонки-маркеры восхода и заката (как в WM8).
+ * Дни недели — короткие (Пн, Вт…), без многоточий.
  */
 class CityPagerAdapter(
     private val context: Context
@@ -58,13 +56,15 @@ class CityPagerAdapter(
         return holder.binding.scrollContent.canScrollVertically(-1)
     }
 
-    /** Какая страница видима и активно ли приложение — управляет анимацией сцен. */
+    /** Какая страница видима и активно ли приложение — сцена и живые иконки. */
     fun setActivePage(position: Int, isResumed: Boolean) {
         activePosition = position
         resumed = isResumed
         holders.values.forEach { holder ->
             val pos = holder.bindingAdapterPosition
-            holder.binding.sceneView.setRunning(pos == position && isResumed)
+            val live = pos == position && isResumed
+            holder.binding.sceneView.setRunning(live)
+            holder.binding.hourlyStrip.setAnimating(live)
         }
     }
 
@@ -83,14 +83,15 @@ class CityPagerAdapter(
     override fun onViewAttachedToWindow(holder: PageHolder) {
         super.onViewAttachedToWindow(holder)
         holders[holder.bindingAdapterPosition] = holder
-        holder.binding.sceneView.setRunning(
-            holder.bindingAdapterPosition == activePosition && resumed
-        )
+        val live = holder.bindingAdapterPosition == activePosition && resumed
+        holder.binding.sceneView.setRunning(live)
+        holder.binding.hourlyStrip.setAnimating(live)
     }
 
     override fun onViewDetachedFromWindow(holder: PageHolder) {
         holders.remove(holder.bindingAdapterPosition)
         holder.binding.sceneView.setRunning(false)
+        holder.binding.hourlyStrip.setAnimating(false)
         super.onViewDetachedFromWindow(holder)
     }
 
@@ -99,24 +100,9 @@ class CityPagerAdapter(
         val data = weatherMap[city.id]
         holder.bind(city, data)
         holders[position] = holder
-        holder.binding.sceneView.setRunning(position == activePosition && resumed)
-    }
-
-    /** Полное название дня («Понедельник»), сегодня/завтра — словами. */
-    private fun fullDayLabel(dayStartMs: Long): String {
-        val cal = Calendar.getInstance()
-        cal.set(Calendar.HOUR_OF_DAY, 0)
-        cal.set(Calendar.MINUTE, 0)
-        cal.set(Calendar.SECOND, 0)
-        cal.set(Calendar.MILLISECOND, 0)
-        val todayStart = cal.timeInMillis
-        val dayMs = 86_400_000L
-        return when {
-            abs(dayStartMs - todayStart) < dayMs / 2 -> context.getString(R.string.today)
-            abs(dayStartMs - todayStart - dayMs) < dayMs / 2 -> context.getString(R.string.tomorrow)
-            else -> SimpleDateFormat("EEEE", Locale.getDefault()).format(Date(dayStartMs))
-                .replaceFirstChar { it.uppercase() }
-        }
+        val live = position == activePosition && resumed
+        holder.binding.sceneView.setRunning(live)
+        holder.binding.hourlyStrip.setAnimating(live)
     }
 
     /** Часы + маркеры восхода/заката в хронологическом порядке. */
@@ -234,7 +220,7 @@ class CityPagerAdapter(
             b.hourlyStrip.setData(buildHourlyColumns(data))
             b.dailyStrip.setData(data.dailyForecast.map { d ->
                 DailyColumn(
-                    day = fullDayLabel(d.date),
+                    day = WeatherFormat.dayLabel(context, d.date),
                     date = WeatherFormat.shortDate(d.date),
                     desc = WeatherIcons.conditionName(context, d.conditionCode),
                     iconRes = WeatherIcons.iconFor(d.conditionCode, true),
