@@ -126,10 +126,14 @@ open class StripView @JvmOverloads constructor(
         return true
     }
 
-    /** Защита от старших контейнеров, минуя собственный HorizontalScrollView. */
+    /**
+     * Защита от старших контейнеров, минуя собственный HorizontalScrollView.
+     * requestDisallowInterceptTouchEvent объявлен в ViewParent (не в View),
+     * поэтому работаем с ссылками типа ViewParent без приведения к View.
+     */
     private fun guardHorizontal(disallow: Boolean) {
-        val hsv = parent as? View ?: return
-        val above = hsv.parent as? View ?: return
+        val hsv = parent ?: return          // HorizontalScrollView как ViewParent
+        val above = hsv.parent ?: return    // карточка над ним как ViewParent
         above.requestDisallowInterceptTouchEvent(disallow)
     }
 
