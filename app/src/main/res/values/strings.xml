@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Всё ясно</string>
-
     <!-- Города -->
     <string name="current_location">Текущее местоположение</string>
     <string name="add_city">Добавить город</string>
@@ -9,7 +8,6 @@
     <string name="city_limit_reached">Максимум 10 городов</string>
     <string name="search_city">Поиск города</string>
     <string name="auto_location">Автоопределение</string>
-
     <!-- Состояния -->
     <string name="no_data">—</string>
     <string name="updated_just_now">Обновлено только что</string>
@@ -20,14 +18,16 @@
     <string name="network_error">Нет свежих данных</string>
     <string name="stale_data_notice">Показаны сохранённые данные</string>
     <string name="loading">Загрузка…</string>
-
     <!-- Действия -->
     <string name="refresh">Обновить</string>
     <string name="settings">Настройки</string>
     <string name="cancel">Отмена</string>
     <string name="ok">ОК</string>
     <string name="delete">Удалить</string>
-
+    <!-- Потягивание обновления -->
+    <string name="refresh_pull">Потяните для обновления</string>
+    <string name="refresh_release">Отпустите для обновления</string>
+    <string name="refresh_running">Обновление…</string>
     <!-- Секции -->
     <string name="hourly_forecast">Почасовой прогноз</string>
     <string name="daily_forecast">Ежедневный прогноз</string>
@@ -37,7 +37,6 @@
     <string name="today">Сегодня</string>
     <string name="tomorrow">Завтра</string>
     <string name="as_of">По состоянию на %1$s</string>
-
     <!-- Показатели -->
     <string name="feels_like">Ощущается</string>
     <string name="wind">Ветер</string>
@@ -53,10 +52,10 @@
     <string name="day_length">Долгота дня</string>
     <string name="wind_gusts">Порывы</string>
     <string name="day_length_format">%1$d ч %2$d мин</string>
-
     <!-- Краткие названия погоды (строки прогноза) -->
     <string name="cond_clear">Ясно</string>
     <string name="cond_fair">Малооблачно</string>
+    <string name="cond_cloudy">Облачно</string>
     <string name="cond_partly">Переменная облачность</string>
     <string name="cond_overcast">Пасмурно</string>
     <string name="cond_thunder">Гроза</string>
@@ -64,7 +63,6 @@
     <string name="cond_rain">Дождь</string>
     <string name="cond_snow">Снег</string>
     <string name="cond_fog">Туман</string>
-
     <!-- Направления ветра -->
     <string name="wind_dir_n">С</string>
     <string name="wind_dir_ne">СВ</string>
@@ -74,21 +72,18 @@
     <string name="wind_dir_sw">ЮЗ</string>
     <string name="wind_dir_w">З</string>
     <string name="wind_dir_nw">СЗ</string>
-
     <!-- Единицы -->
     <string name="unit_ms">м/с</string>
     <string name="unit_kmh">км/ч</string>
     <string name="unit_mhg">мм рт. ст.</string>
     <string name="unit_hpa">гПа</string>
     <string name="unit_km">км</string>
-
     <!-- УФ -->
     <string name="uv_low">Низкий</string>
     <string name="uv_moderate">Умеренный</string>
     <string name="uv_high">Высокий</string>
     <string name="uv_very_high">Очень высокий</string>
     <string name="uv_extreme">Экстремальный</string>
-
     <!-- Луна -->
     <string name="moon_new">Новолуние</string>
     <string name="moon_waxing_crescent">Растущий серп</string>
