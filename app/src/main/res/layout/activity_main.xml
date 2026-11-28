@@ -5,8 +5,9 @@
     android:layout_height="match_parent"
     android:fitsSystemWindows="true">
 
-    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-        android:id="@+id/swipeRefresh"
+    <!-- Собственный потягиватель: только сдвигает содержимое, не ломает прокрутку -->
+    <com.v8td.allclear.ui.PullRefreshLayout
+        android:id="@+id/pullRefresh"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
@@ -14,8 +15,7 @@
             android:id="@+id/cityPager"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
-
-    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+    </com.v8td.allclear.ui.PullRefreshLayout>
 
     <!-- Верхняя панель: обновление и меню -->
     <LinearLayout
@@ -65,5 +65,4 @@
         android:textColor="@color/white_70"
         android:textSize="16sp"
         android:visibility="gone" />
-
 </FrameLayout>
