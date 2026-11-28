@@ -17,13 +17,14 @@ import kotlin.math.min
 /**
  * Собственный потягиватель обновления вместо SwipeRefreshLayout.
  *
- * Пока палец тянет вниз (страница в самом верху) содержимое чуть оттягивается
- * (не более 24dp) — только тактильный отклик. Во время обновления страница
- * стоит на месте, индикатор висит поверх сцены; прокрутка полностью свободна.
- * Размеры и границы прокрутки не меняются никогда — залипание невозможно.
+ * Содержимое НЕ сдвигается вообще: индикатор проявляется поверх сцены
+ * (прогресс-дуга пока тянет палец, вращение пока идёт загрузка).
+ * Размеры и границы прокрутки не меняются никогда — залипание и рывки
+ * невозможны конструктивно.
  *
  * Внутри должен лежать ровно один ребёнок — ViewPager2.
- * Горизонтальные свайпы городов не перехватываются.
+ * Потягивание перехватывается только при явном вертикальном жесте
+ * (dy > 2*slop и dy > 1.5*|dx|), чтобы не мешать горизонтальным лентам.
  */
 class PullRefreshLayout @JvmOverloads constructor(
     context: Context,
@@ -41,8 +42,7 @@ class PullRefreshLayout @JvmOverloads constructor(
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
     private val triggerPull = 64f * density   // порог срабатывания при отпускании
-    private val maxPull = 150f * density      // предел оттягивания пальцем
-    private val maxShift = 24f * density      // максимум сдвига содержимого
+    private val maxPull = 150f * density      // предел «натяжения» пальцем
     private val spinnerY = 96f * density      // центр индикатора поверх сцены
     private val radius = 17f * density
     private val strokeW = 3f * density
@@ -72,7 +72,8 @@ class PullRefreshLayout @JvmOverloads constructor(
     fun beginRefresh() {
         if (refreshing) return
         refreshing = true
-        animateTo(0f)          // содержимое сразу возвращается на место
+        animator?.cancel()
+        pull = triggerPull
         onRefresh()
         invalidate()
     }
@@ -96,7 +97,7 @@ class PullRefreshLayout @JvmOverloads constructor(
             MotionEvent.ACTION_MOVE -> {
                 val dy = ev.y - downY
                 val dx = ev.x - downX
-                if (!pulling && dy > touchSlop && dy > abs(dx) && !canScrollUp()) {
+                if (!pulling && dy > touchSlop * 2 && dy > abs(dx) * 1.5f && !canScrollUp()) {
                     pulling = true
                     animator?.cancel()
                     return true
@@ -148,15 +149,13 @@ class PullRefreshLayout @JvmOverloads constructor(
 
     private fun setPull(v: Float) {
         pull = v
-        // Лёгкий тактильный сдвиг только пока тянет палец; при обновлении — ноль.
-        getChildAt(0)?.translationY = if (refreshing) 0f else min(v, maxShift)
         invalidate()
     }
 
     private fun animateTo(target: Float) {
         animator?.cancel()
         val a = ValueAnimator.ofFloat(pull, target)
-        a.duration = 240L
+        a.duration = 220L
         a.interpolator = DecelerateInterpolator()
         a.addUpdateListener { setPull(it.animatedValue as Float) }
         a.start()
