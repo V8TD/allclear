@@ -77,129 +77,129 @@
                     android:layout_marginTop="6dp"
                     android:textAppearance="@style/TextAppearance.AllClear.Caption" />
             </LinearLayout>
+
+            <!-- Мини-строка из 4 показателей: теперь на сцене, как в WM8 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:layout_marginStart="10dp"
+                android:layout_marginEnd="10dp"
+                android:layout_marginBottom="8dp"
+                android:orientation="horizontal"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/wind"
+                        android:textAppearance="@style/TextAppearance.AllClear.TileLabel" />
+
+                    <TextView
+                        android:id="@+id/miniWind"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/no_data"
+                        android:textColor="@color/white"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="match_parent"
+                    android:background="@color/card_divider" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/humidity"
+                        android:textAppearance="@style/TextAppearance.AllClear.TileLabel" />
+
+                    <TextView
+                        android:id="@+id/miniHumidity"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/no_data"
+                        android:textColor="@color/white"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="match_parent"
+                    android:background="@color/card_divider" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/pressure"
+                        android:textAppearance="@style/TextAppearance.AllClear.TileLabel" />
+
+                    <TextView
+                        android:id="@+id/miniPressure"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/no_data"
+                        android:textColor="@color/white"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="match_parent"
+                    android:background="@color/card_divider" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/feels_like"
+                        android:textAppearance="@style/TextAppearance.AllClear.TileLabel" />
+
+                    <TextView
+                        android:id="@+id/miniFeels"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/no_data"
+                        android:textColor="@color/white"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </LinearLayout>
         </FrameLayout>
 
-        <!-- Мини-строка из 4 показателей -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
-            android:layout_marginTop="4dp"
-            android:layout_marginEnd="10dp"
-            android:background="@drawable/bg_card"
-            android:orientation="horizontal"
-            android:paddingTop="10dp"
-            android:paddingBottom="10dp">
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/wind"
-                    android:textAppearance="@style/TextAppearance.AllClear.TileLabel" />
-
-                <TextView
-                    android:id="@+id/miniWind"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="@string/no_data"
-                    android:textColor="@color/white"
-                    android:textSize="14sp" />
-            </LinearLayout>
-
-            <View
-                android:layout_width="1dp"
-                android:layout_height="match_parent"
-                android:background="@color/card_divider" />
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/humidity"
-                    android:textAppearance="@style/TextAppearance.AllClear.TileLabel" />
-
-                <TextView
-                    android:id="@+id/miniHumidity"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="@string/no_data"
-                    android:textColor="@color/white"
-                    android:textSize="14sp" />
-            </LinearLayout>
-
-            <View
-                android:layout_width="1dp"
-                android:layout_height="match_parent"
-                android:background="@color/card_divider" />
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/pressure"
-                    android:textAppearance="@style/TextAppearance.AllClear.TileLabel" />
-
-                <TextView
-                    android:id="@+id/miniPressure"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="@string/no_data"
-                    android:textColor="@color/white"
-                    android:textSize="14sp" />
-            </LinearLayout>
-
-            <View
-                android:layout_width="1dp"
-                android:layout_height="match_parent"
-                android:background="@color/card_divider" />
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/feels_like"
-                    android:textAppearance="@style/TextAppearance.AllClear.TileLabel" />
-
-                <TextView
-                    android:id="@+id/miniFeels"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="@string/no_data"
-                    android:textColor="@color/white"
-                    android:textSize="14sp" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <!-- Карточка: почасовой прогноз -->
+        <!-- Карточка: почасовой прогноз (горизонтальная лента WM8) -->
         <LinearLayout
             android:id="@+id/cardHourly"
             android:layout_width="match_parent"
@@ -217,17 +217,22 @@
                 android:text="@string/hourly_forecast"
                 android:textAppearance="@style/TextAppearance.AllClear.CardHeader" />
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/hourlyList"
+            <HorizontalScrollView
+                android:id="@+id/hourlyScroll"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:clipToPadding="false"
-                android:orientation="horizontal"
-                android:overScrollMode="never" />
+                android:overScrollMode="never"
+                android:scrollbars="none">
+
+                <com.v8td.allclear.ui.HourlyStripView
+                    android:id="@+id/hourlyStrip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </HorizontalScrollView>
         </LinearLayout>
 
-        <!-- Карточка: ежедневный прогноз -->
+        <!-- Карточка: ежедневный прогноз (горизонтальные колонки-дни WM8) -->
         <LinearLayout
             android:id="@+id/cardDaily"
             android:layout_width="match_parent"
@@ -245,13 +250,19 @@
                 android:text="@string/daily_forecast"
                 android:textAppearance="@style/TextAppearance.AllClear.CardHeader" />
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/dailyList"
+            <HorizontalScrollView
+                android:id="@+id/dailyScroll"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:nestedScrollingEnabled="false"
-                android:overScrollMode="never" />
+                android:layout_marginTop="8dp"
+                android:overScrollMode="never"
+                android:scrollbars="none">
+
+                <com.v8td.allclear.ui.DailyStripView
+                    android:id="@+id/dailyStrip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </HorizontalScrollView>
         </LinearLayout>
 
         <!-- Карточка: подробности -->
@@ -355,6 +366,13 @@
                         android:textSize="14sp" />
                 </LinearLayout>
             </LinearLayout>
+
+            <!-- Дуга солнца с точкой текущего положения и временами -->
+            <com.v8td.allclear.ui.SunArcView
+                android:id="@+id/sunArcView"
+                android:layout_width="match_parent"
+                android:layout_height="72dp"
+                android:layout_marginTop="10dp" />
         </LinearLayout>
 
         <!-- Подпись актуальности -->
@@ -365,6 +383,5 @@
             android:layout_marginTop="10dp"
             android:gravity="center"
             android:textAppearance="@style/TextAppearance.AllClear.Caption" />
-
     </LinearLayout>
 </ScrollView>
