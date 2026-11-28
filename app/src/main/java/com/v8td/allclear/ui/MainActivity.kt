@@ -7,7 +7,6 @@ import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.viewpager2.widget.ViewPager2
 import com.v8td.allclear.R
@@ -24,10 +23,9 @@ import kotlinx.coroutines.launch
 
 /**
  * Главный экран: страницы городов (свайп), потянуть-обновить, живая сцена.
- *
- * Обновление «потянуть вниз»: SwipeRefresh всегда включён, а решение
- * «тянуть обновление или скроллить контент» принимает штатный callback
- * canChildScrollUp — без переключений посреди жеста (это вызывало застревание).
+ * Обновление «потянуть вниз» обслуживает собственный PullRefreshLayout:
+ * он только сдвигает содержимое через translationY и не трогает границы
+ * прокрутки — залипание из багa AC2 конструктивно невозможно.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -62,9 +60,9 @@ class MainActivity : AppCompatActivity() {
         repository = WeatherRepository(this)
         locationHelper = LocationHelper(this)
         settings = AppSettings(this)
-
         adapter = CityPagerAdapter(this)
         binding.cityPager.adapter = adapter
+
         binding.cityPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
                 adapter.setActivePage(position, resumed)
@@ -75,20 +73,10 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        binding.swipeRefresh.setColorSchemeColors(
-            ContextCompat.getColor(this, R.color.accent_blue)
-        )
-        binding.swipeRefresh.setProgressBackgroundColorSchemeColor(
-            ContextCompat.getColor(this, R.color.card_background)
-        )
-        // Штатный механизм: если страница может скроллиться вверх — жест уходит контенту,
+        // Потягивание: если страница может скроллиться вверх — жест уходит контенту,
         // если страница в самом верху — жест запускает обновление.
-        binding.swipeRefresh.setOnChildScrollUpCallback { _, _ ->
-            adapter.canCurrentPageScrollUp()
-        }
-        binding.swipeRefresh.setOnRefreshListener {
-            refreshCurrent(force = true)
-        }
+        binding.pullRefresh.canScrollUp = { adapter.canCurrentPageScrollUp() }
+        binding.pullRefresh.onRefresh = { refreshCurrent(force = true) }
 
         binding.btnRefresh.setOnClickListener { refreshCurrent(force = true) }
         binding.btnMenu.setOnClickListener { view ->
@@ -175,7 +163,7 @@ class MainActivity : AppCompatActivity() {
             val data: WeatherData? = result.getOrNull()
             adapter.updateWeather(city.id, data)
             if (position == binding.cityPager.currentItem) {
-                binding.swipeRefresh.isRefreshing = false
+                binding.pullRefresh.finishRefresh()
                 if (data == null) {
                     Toast.makeText(this@MainActivity, R.string.network_error, Toast.LENGTH_SHORT).show()
                 } else if (repository.getLastError() != null) {
@@ -188,10 +176,10 @@ class MainActivity : AppCompatActivity() {
     private fun refreshCurrent(force: Boolean) {
         val position = binding.cityPager.currentItem
         if (adapter.getCity(position) == null) {
-            binding.swipeRefresh.isRefreshing = false
+            binding.pullRefresh.finishRefresh()
             return
         }
-        binding.swipeRefresh.isRefreshing = true
+        binding.pullRefresh.beginRefresh()
         loadWeatherForPage(position, force)
     }
 
