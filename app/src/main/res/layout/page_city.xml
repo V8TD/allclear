@@ -78,7 +78,7 @@
                     android:textAppearance="@style/TextAppearance.AllClear.Caption" />
             </LinearLayout>
 
-            <!-- Мини-строка из 4 показателей: теперь на сцене, как в WM8 -->
+            <!-- Мини-строка из 4 показателей на сцене, как в WM8 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -199,7 +199,7 @@
             </LinearLayout>
         </FrameLayout>
 
-        <!-- Карточка: почасовой прогноз (горизонтальная лента WM8) -->
+        <!-- Карточка: почасовой прогноз. Лента во всю ширину карточки (WM8) -->
         <LinearLayout
             android:id="@+id/cardHourly"
             android:layout_width="match_parent"
@@ -208,12 +208,14 @@
             android:layout_marginTop="8dp"
             android:layout_marginEnd="10dp"
             android:background="@drawable/bg_card"
-            android:orientation="vertical"
-            android:padding="12dp">
+            android:orientation="vertical">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_marginTop="12dp"
+                android:layout_marginEnd="12dp"
                 android:text="@string/hourly_forecast"
                 android:textAppearance="@style/TextAppearance.AllClear.CardHeader" />
 
@@ -221,7 +223,8 @@
                 android:id="@+id/hourlyScroll"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="8dp"
                 android:overScrollMode="never"
                 android:scrollbars="none">
 
@@ -232,7 +235,7 @@
             </HorizontalScrollView>
         </LinearLayout>
 
-        <!-- Карточка: ежедневный прогноз (горизонтальные колонки-дни WM8) -->
+        <!-- Карточка: ежедневный прогноз. Лента во всю ширину карточки (WM8) -->
         <LinearLayout
             android:id="@+id/cardDaily"
             android:layout_width="match_parent"
@@ -241,12 +244,14 @@
             android:layout_marginTop="8dp"
             android:layout_marginEnd="10dp"
             android:background="@drawable/bg_card"
-            android:orientation="vertical"
-            android:padding="12dp">
+            android:orientation="vertical">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_marginTop="12dp"
+                android:layout_marginEnd="12dp"
                 android:text="@string/daily_forecast"
                 android:textAppearance="@style/TextAppearance.AllClear.CardHeader" />
 
@@ -254,7 +259,8 @@
                 android:id="@+id/dailyScroll"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="8dp"
                 android:overScrollMode="never"
                 android:scrollbars="none">
 
