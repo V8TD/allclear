@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.v8td.allclear.R
 import com.v8td.allclear.data.City
@@ -23,9 +24,11 @@ import kotlinx.coroutines.launch
 
 /**
  * Главный экран: страницы городов (свайп), потянуть-обновить, живая сцена.
- * Обновление «потянуть вниз» обслуживает собственный PullRefreshLayout:
- * он только сдвигает содержимое через translationY и не трогает границы
- * прокрутки — залипание из багa AC2 конструктивно невозможно.
+ *
+ * Важно: у внутреннего RecyclerView ViewPager2 ВЫКЛЮЧЕНЫ анимации изменений.
+ * Иначе при каждом обновлении данных RecyclerView делает кроссфейд старой и
+ * новой копии страницы — на экране одновременно видны две прокрутки
+ * («призраки» и ощущение прыжков, баг AC2).
  */
 class MainActivity : AppCompatActivity() {
 
@@ -62,6 +65,12 @@ class MainActivity : AppCompatActivity() {
         settings = AppSettings(this)
         adapter = CityPagerAdapter(this)
         binding.cityPager.adapter = adapter
+
+        // Убираем кроссфейд копий страницы при обновлении данных (призраки AC2).
+        (binding.cityPager.getChildAt(0) as? RecyclerView)?.let { inner ->
+            inner.itemAnimator = null
+            inner.overScrollMode = View.OVER_SCROLL_NEVER
+        }
 
         binding.cityPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
