@@ -17,14 +17,13 @@ import kotlin.math.min
 /**
  * Собственный потягиватель обновления вместо SwipeRefreshLayout.
  *
- * Принцип: при потягивании вниз (когда страница на самом верху) содержимое
- * плавно сдвигается вниз через translationY. Размеры и границы прокрутки
- * НИКОГДА не меняются, поэтому страница не может "телепортироваться" и
- * залипать в узком диапазоне (баг AC2).
+ * Пока палец тянет вниз (страница в самом верху) содержимое чуть оттягивается
+ * (не более 24dp) — только тактильный отклик. Во время обновления страница
+ * стоит на месте, индикатор висит поверх сцены; прокрутка полностью свободна.
+ * Размеры и границы прокрутки не меняются никогда — залипание невозможно.
  *
  * Внутри должен лежать ровно один ребёнок — ViewPager2.
- * Горизонтальные свайпы городов не перехватываются: потягивание срабатывает
- * только когда вертикальное движение больше горизонтального.
+ * Горизонтальные свайпы городов не перехватываются.
  */
 class PullRefreshLayout @JvmOverloads constructor(
     context: Context,
@@ -41,16 +40,18 @@ class PullRefreshLayout @JvmOverloads constructor(
     private val density = resources.displayMetrics.density
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
-    private val holdOffset = 64f * density   // насколько сдвинуто во время обновления
-    private val maxOffset = 150f * density   // предел сдвига при потягивании
-    private val radius = 17f * density       // радиус кружка-индикатора
+    private val triggerPull = 64f * density   // порог срабатывания при отпускании
+    private val maxPull = 150f * density      // предел оттягивания пальцем
+    private val maxShift = 24f * density      // максимум сдвига содержимого
+    private val spinnerY = 96f * density      // центр индикатора поверх сцены
+    private val radius = 17f * density
     private val strokeW = 3f * density
 
     private var downX = 0f
     private var downY = 0f
     private var pulling = false
     private var refreshing = false
-    private var offset = 0f
+    private var pull = 0f
     private var animator: ValueAnimator? = null
 
     private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -71,14 +72,16 @@ class PullRefreshLayout @JvmOverloads constructor(
     fun beginRefresh() {
         if (refreshing) return
         refreshing = true
-        animateTo(holdOffset)
+        animateTo(0f)          // содержимое сразу возвращается на место
         onRefresh()
+        invalidate()
     }
 
     /** Вызывать по завершении загрузки (успех или ошибка). */
     fun finishRefresh() {
         refreshing = false
         animateTo(0f)
+        invalidate()
     }
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
@@ -88,7 +91,7 @@ class PullRefreshLayout @JvmOverloads constructor(
                 downX = ev.x
                 downY = ev.y
                 pulling = false
-                if (offset > 0f) animator?.cancel()
+                if (pull > 0f) animator?.cancel()
             }
             MotionEvent.ACTION_MOVE -> {
                 val dy = ev.y - downY
@@ -108,12 +111,12 @@ class PullRefreshLayout @JvmOverloads constructor(
         when (ev.actionMasked) {
             MotionEvent.ACTION_MOVE -> {
                 val dy = ev.y - downY
-                setOffset(min(maxOffset, max(0f, dy * 0.5f)))
+                setPull(min(maxPull, max(0f, dy * 0.5f)))
                 return true
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 pulling = false
-                if (offset >= holdOffset) beginRefresh() else animateTo(0f)
+                if (pull >= triggerPull) beginRefresh() else animateTo(0f)
                 return true
             }
         }
@@ -126,10 +129,10 @@ class PullRefreshLayout @JvmOverloads constructor(
     }
 
     private fun drawIndicator(canvas: Canvas) {
-        if (offset <= 2f * density && !refreshing) return
-        val progress = min(1f, offset / holdOffset)
+        val progress = if (refreshing) 1f else min(1f, pull / triggerPull)
+        if (progress <= 0.02f) return
         val cx = width / 2f
-        val cy = max(radius + 2f * density, offset - radius - 6f * density)
+        val cy = spinnerY
         trackPaint.alpha = (70 * progress).toInt()
         canvas.drawCircle(cx, cy, radius, trackPaint)
         arcPaint.alpha = (255 * progress).toInt()
@@ -143,18 +146,19 @@ class PullRefreshLayout @JvmOverloads constructor(
         }
     }
 
-    private fun setOffset(v: Float) {
-        offset = v
-        getChildAt(0)?.translationY = v
+    private fun setPull(v: Float) {
+        pull = v
+        // Лёгкий тактильный сдвиг только пока тянет палец; при обновлении — ноль.
+        getChildAt(0)?.translationY = if (refreshing) 0f else min(v, maxShift)
         invalidate()
     }
 
     private fun animateTo(target: Float) {
         animator?.cancel()
-        val a = ValueAnimator.ofFloat(offset, target)
+        val a = ValueAnimator.ofFloat(pull, target)
         a.duration = 240L
         a.interpolator = DecelerateInterpolator()
-        a.addUpdateListener { setOffset(it.animatedValue as Float) }
+        a.addUpdateListener { setPull(it.animatedValue as Float) }
         a.start()
         animator = a
     }
