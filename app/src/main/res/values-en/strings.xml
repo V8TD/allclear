@@ -1,14 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">All Clear</string>
-
     <string name="current_location">Current location</string>
     <string name="add_city">Add city</string>
     <string name="remove_city">Remove city</string>
     <string name="city_limit_reached">Maximum 10 cities</string>
     <string name="search_city">Search city</string>
     <string name="auto_location">Auto-detect</string>
-
     <string name="no_data">—</string>
     <string name="updated_just_now">Updated just now</string>
     <string name="updated_min_ago">Updated %1$d min ago</string>
@@ -18,13 +16,14 @@
     <string name="network_error">No fresh data</string>
     <string name="stale_data_notice">Showing saved data</string>
     <string name="loading">Loading…</string>
-
     <string name="refresh">Refresh</string>
     <string name="settings">Settings</string>
     <string name="cancel">Cancel</string>
     <string name="ok">OK</string>
     <string name="delete">Delete</string>
-
+    <string name="refresh_pull">Pull down to update</string>
+    <string name="refresh_release">Release to update</string>
+    <string name="refresh_running">Updating…</string>
     <string name="hourly_forecast">Hourly forecast</string>
     <string name="daily_forecast">Daily forecast</string>
     <string name="details">Details</string>
@@ -33,7 +32,6 @@
     <string name="today">Today</string>
     <string name="tomorrow">Tomorrow</string>
     <string name="as_of">As of %1$s</string>
-
     <string name="feels_like">Feels like</string>
     <string name="wind">Wind</string>
     <string name="humidity">Humidity</string>
@@ -48,9 +46,9 @@
     <string name="day_length">Day length</string>
     <string name="wind_gusts">Gusts</string>
     <string name="day_length_format">%1$d h %2$d min</string>
-
     <string name="cond_clear">Clear</string>
     <string name="cond_fair">Mostly clear</string>
+    <string name="cond_cloudy">Cloudy</string>
     <string name="cond_partly">Partly cloudy</string>
     <string name="cond_overcast">Overcast</string>
     <string name="cond_thunder">Thunderstorm</string>
@@ -58,7 +56,6 @@
     <string name="cond_rain">Rain</string>
     <string name="cond_snow">Snow</string>
     <string name="cond_fog">Fog</string>
-
     <string name="wind_dir_n">N</string>
     <string name="wind_dir_ne">NE</string>
     <string name="wind_dir_e">E</string>
@@ -67,19 +64,16 @@
     <string name="wind_dir_sw">SW</string>
     <string name="wind_dir_w">W</string>
     <string name="wind_dir_nw">NW</string>
-
     <string name="unit_ms">m/s</string>
     <string name="unit_kmh">km/h</string>
     <string name="unit_mhg">mmHg</string>
     <string name="unit_hpa">hPa</string>
     <string name="unit_km">km</string>
-
     <string name="uv_low">Low</string>
     <string name="uv_moderate">Moderate</string>
     <string name="uv_high">High</string>
     <string name="uv_very_high">Very high</string>
     <string name="uv_extreme">Extreme</string>
-
     <string name="moon_new">New moon</string>
     <string name="moon_waxing_crescent">Waxing crescent</string>
     <string name="moon_first_quarter">First quarter</string>
