@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
+import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
@@ -16,6 +17,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 /**
  * Колонка почасового прогноза (одна точка кривой).
@@ -128,12 +130,11 @@ open class StripView @JvmOverloads constructor(
 
     /**
      * Защита от старших контейнеров, минуя собственный HorizontalScrollView.
-     * requestDisallowInterceptTouchEvent объявлен в ViewParent (не в View),
-     * поэтому работаем с ссылками типа ViewParent без приведения к View.
+     * requestDisallowInterceptTouchEvent объявлен в ViewParent (не в View).
      */
     private fun guardHorizontal(disallow: Boolean) {
-        val hsv = parent ?: return          // HorizontalScrollView как ViewParent
-        val above = hsv.parent ?: return    // карточка над ним как ViewParent
+        val hsv = parent ?: return
+        val above = hsv.parent ?: return
         above.requestDisallowInterceptTouchEvent(disallow)
     }
 
@@ -141,7 +142,7 @@ open class StripView @JvmOverloads constructor(
 
     protected fun tempLabel(v: Double): String = "${v.roundToInt()}°"
 
-    /** Обрезка длинного названия многоточием, как в WM8 («Понедельн…»). */
+    /** Обрезка длинного описания многоточием (только как страховка). */
     protected fun fit(text: String, maxW: Float, p: Paint): String {
         if (p.measureText(text) <= maxW) return text
         var t = text
@@ -154,12 +155,20 @@ open class StripView @JvmOverloads constructor(
         for (r in resIds) icons.add(if (r == 0) null else ContextCompat.getDrawable(context, r))
     }
 
-    protected fun drawIcon(canvas: Canvas, i: Int, centerY: Float, size: Float) {
+    protected fun drawIcon(
+        canvas: Canvas,
+        i: Int,
+        centerY: Float,
+        size: Float,
+        dx: Float = 0f,
+        dy: Float = 0f
+    ) {
         val dr = icons.getOrNull(i) ?: return
-        val x = cx(i)
+        val x = cx(i) + dx
+        val y = centerY + dy
         dr.setBounds(
-            (x - size / 2f).toInt(), (centerY - size / 2f).toInt(),
-            (x + size / 2f).toInt(), (centerY + size / 2f).toInt()
+            (x - size / 2f).toInt(), (y - size / 2f).toInt(),
+            (x + size / 2f).toInt(), (y + size / 2f).toInt()
         )
         dr.draw(canvas)
     }
@@ -217,7 +226,11 @@ open class StripView @JvmOverloads constructor(
     }
 }
 
-/** ПОЧАСОВОЙ ПРОГНОЗ WM8: % / кривая / иконки только при смене погоды / время / дата. */
+/**
+ * ПОЧАСОВОЙ ПРОГНОЗ WM8: % / кривая / иконка в КАЖДОЙ колонке (живая,
+ * мягко дрейфует) / время / дата. Анимация включается только для видимой
+ * страницы активного приложения и полностью останавливается иначе.
+ */
 class HourlyStripView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
@@ -228,6 +241,13 @@ class HourlyStripView @JvmOverloads constructor(
 
     private var cols: List<HourlyColumn> = emptyList()
     private var ys = FloatArray(0)
+    private var animating = false
+
+    fun setAnimating(on: Boolean) {
+        if (on == animating) return
+        animating = on
+        if (on) postInvalidateOnAnimation() else invalidate()
+    }
 
     fun setData(list: List<HourlyColumn>) {
         cols = list
@@ -259,12 +279,16 @@ class HourlyStripView @JvmOverloads constructor(
             }
         }
         drawCurve(canvas, ys, 0xFF4FC3F7.toInt())
+
+        val t = SystemClock.uptimeMillis() / 1000f
         for (i in cols.indices) {
             val c = cols[i]
             val x = cx(i)
-            // Иконка под кривой — только там, где погода меняется (как в WM8).
-            if (c.marker == 0 && (i == 0 || c.code != cols[i - 1].code)) {
-                drawIcon(canvas, i, 98f * d, 22f * d)
+            if (c.marker == 0) {
+                // Иконка в каждой колонке; лёгкий живой дрейф, свой у каждой.
+                val dx = if (animating) sin(t * 0.9f + i * 0.6f) * 2f * d else 0f
+                val dy = if (animating) sin(t * 1.4f + i * 0.9f) * 1.5f * d else 0f
+                drawIcon(canvas, i, 98f * d, 22f * d, dx, dy)
             }
             textValue.color = 0xFFECEFF1.toInt()
             canvas.drawText(c.time, x, 122f * d, textValue)
@@ -273,6 +297,7 @@ class HourlyStripView @JvmOverloads constructor(
                 canvas.drawText(c.date, x, 136f * d, textSmall)
             }
         }
+        if (animating) postInvalidateOnAnimation()
     }
 }
 
@@ -314,7 +339,7 @@ class DailyStripView @JvmOverloads constructor(
             val c = cols[i]
             val x = cx(i)
             textValue.color = if (i < 2) 0xFF4FC3F7.toInt() else 0xFFECEFF1.toInt()
-            canvas.drawText(fit(c.day, colW - 6f * d, textValue), x, 18f * d, textValue)
+            canvas.drawText(c.day, x, 18f * d, textValue)
             textSmall.color = 0xFF78909C.toInt()
             canvas.drawText(c.date, x, 32f * d, textSmall)
             drawIcon(canvas, i, 52f * d, 26f * d)
